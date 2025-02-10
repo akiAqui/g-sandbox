@@ -32,7 +32,7 @@ scene.add(mesh);
 
 // レンダリングループ
 function animate() {
-  material.uniforms.time.value = performance.now() * 0.008;
+  material.uniforms.time.value = performance.now() * 0.8;
 
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
