@@ -30,6 +30,16 @@ const material = new THREE.ShaderMaterial({
 const mesh = new THREE.Mesh(geometry, material);
 scene.add(mesh);
 
+if (import.meta.hot) {
+  import.meta.hot.accept(['./fragment.glsl', './vertex.glsl'], (modules) => {
+    console.log('GLSLファイルが変更された');
+    if (modules) {
+      material.fragmentShader = modules[0].default;
+      material.needsUpdate = true;
+    }
+  });
+}
+
 // レンダリングループ
 function animate() {
   material.uniforms.time.value = performance.now() * 0.8;
