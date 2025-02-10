@@ -2,6 +2,7 @@ precision highp float;
 varying vec2 vUv;
 uniform vec2 resolution;
 uniform float time;
+
 float natan(float y, float x) {
   float PI  = 3.141592653589793;
   float angle = atan(y, x);  // 値域: [-π, π]
