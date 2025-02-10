@@ -42,7 +42,7 @@ if (import.meta.hot) {
 
 // レンダリングループ
 function animate() {
-  material.uniforms.time.value = performance.now() * 0.8;
+  material.uniforms.time.value = performance.now() * 0.01;
 
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
