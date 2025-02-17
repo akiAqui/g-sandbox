@@ -6,10 +6,53 @@
     <title>メビウス変換テクスチャ生成</title>
 </head>
 <body>
-    <input type="file" id="fileInput" accept="image/*">
-    <button id="saveButton">保存</button>
+    <div id="controls" style="position: fixed; top: 10px; left: 10px;">
+        <div class="directory-section">
+            <h3>入力テクスチャディレクトリ</h3>
+            <button id="selectInputTextureDirButton">選択</button>
+            <div id="inputTextureDir" class="dir-display">未選択</div>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+        
+        <div class="directory-section">
+            <h3>出力テクスチャディレクトリ</h3>
+            <button id="selectOutputTextureDirButton">選択</button>
+            <div id="outputTextureDir" class="dir-display">未選択</div>
+            <button id="saveButton">テクスチャ保存</button>
+        </div>
+
+        <div class="directory-section">
+            <h3>JSONディレクトリ</h3>
+            <button id="selectJsonDirButton">選択</button>
+            <div id="jsonDir" class="dir-display">未選択</div>
+            <button id="saveJsonButton">Save JSON</button>
+            <input type="file" id="jsonInput" accept=".json" style="display: none;">
+            <button id="loadJsonButton">Load JSON</button>
+        </div>
+    </div>
     <canvas id="glCanvas"></canvas>
     <script type="module" src="/src/main.ts"></script>
+
+    <style>
+        .directory-section {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+        .directory-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        .dir-display {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #666;
+        }
+        button {
+            margin: 5px 0;
+        }
+    </style>
 </body>
 </html>
-
