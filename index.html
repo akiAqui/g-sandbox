@@ -1,58 +1,31 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>メビウス変換テクスチャ生成</title>
-</head>
-<body>
-    <div id="controls" style="position: fixed; top: 10px; left: 10px;">
-        <div class="directory-section">
-            <h3>入力テクスチャディレクトリ</h3>
-            <button id="selectInputTextureDirButton">選択</button>
-            <div id="inputTextureDir" class="dir-display">未選択</div>
-            <input type="file" id="fileInput" accept="image/*">
-        </div>
-        
-        <div class="directory-section">
-            <h3>出力テクスチャディレクトリ</h3>
-            <button id="selectOutputTextureDirButton">選択</button>
-            <div id="outputTextureDir" class="dir-display">未選択</div>
-            <button id="saveButton">テクスチャ保存</button>
-        </div>
-
-        <div class="directory-section">
-            <h3>JSONディレクトリ</h3>
-            <button id="selectJsonDirButton">選択</button>
-            <div id="jsonDir" class="dir-display">未選択</div>
-            <button id="saveJsonButton">Save JSON</button>
-            <input type="file" id="jsonInput" accept=".json" style="display: none;">
-            <button id="loadJsonButton">Load JSON</button>
-        </div>
-    </div>
-    <canvas id="glCanvas"></canvas>
-    <script type="module" src="/src/main.ts"></script>
-
+    <title>GLSL Shader Effects</title>
     <style>
-        .directory-section {
-            margin-bottom: 20px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: rgba(255, 255, 255, 0.9);
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .directory-section h3 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
+        
+        body {
+            overflow: hidden;
+            background-color: #000;
         }
-        .dir-display {
-            margin: 5px 0;
-            font-size: 12px;
-            color: #666;
+        
+        canvas {
+            display: block;
         }
-        button {
-            margin: 5px 0;
+        
+        .lil-gui {
+            --width: 300px;
         }
     </style>
+</head>
+<body>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
