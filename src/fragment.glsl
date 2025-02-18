@@ -2,7 +2,7 @@ precision mediump float;
 
 uniform sampler2D texture1;
 uniform vec2 a, b, c, d;
-varying vec2 vUV;
+varying vec2 vUv;
 
 vec2 mobiusTransform(vec2 z) {
     vec2 num = a * z + b;

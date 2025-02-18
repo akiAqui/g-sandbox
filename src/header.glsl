@@ -4,7 +4,7 @@ uniform sampler2D uTexture;    // 入力テクスチャ
 uniform float uTime;           // 時間
 uniform vec2 uResolution;      // 画面解像度
 
-varying vec2 vUv;             // UV座標
+// varying vec2 vUv;             // UV座標
 
 // 2次元ベクトルの長さの二乗を計算
 float length2(vec2 p) {

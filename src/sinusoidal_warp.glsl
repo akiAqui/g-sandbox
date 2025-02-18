@@ -1,35 +1,18 @@
-// shaders/effects/sinusoidal_warp.glsl
-
 #include header.glsl
 
-// 
-// 独立した方向の波動
-//   X方向のサイン波変形
-//   Y方向のコサイン波変形
-//   時間による継続的なアニメーション
-// 
-// 複合的な波動効果
-//   主要な方向性のある波動
-//   二次的な放射状の波動
-//   距離に応じた効果の減衰
-// 
-// 視覚的な品質向上
-//   スムーズなエッジ処理
-//   変形の強さに基づく動的なブレンド
-//   波動効果の強調による立体感
-// 
-
-
-
-// エフェクト固有のuniform変数
 uniform float uAmpX;      // X方向の振幅
 uniform float uAmpY;      // Y方向の振幅
 uniform float uFreqX;     // X方向の周波数
 uniform float uFreqY;     // Y方向の周波数
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換
     vec2 uv = transformUV(vUv, vec2(0.5));
+    
+    // デカルト座標から極座標へ変換
+    float r, theta;
+    cartesianToPolar(uv, r, theta);
     
     // Sinusoidal Warp変換の適用
     // 1. X方向のサイン波による変形

@@ -24,6 +24,7 @@
 // エフェクト固有のuniform変数
 uniform float uAlpha;     // 渦の強さ
 uniform float uBeta;      // 減衰係数
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換

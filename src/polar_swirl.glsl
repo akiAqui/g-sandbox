@@ -23,6 +23,7 @@
 uniform float uAlpha;     // 半径方向の歪みの強さ
 uniform float uBeta;      // 角度依存の周波数
 uniform float uK;         // 回転係数
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換

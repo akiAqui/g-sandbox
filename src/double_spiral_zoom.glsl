@@ -27,6 +27,7 @@ uniform float uK1;        // 線形回転係数
 uniform float uK2;        // 対数回転係数
 uniform float uGamma;     // ズーム係数
 uniform float uEpsilon;   // 小さな定数（0除算防止）
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換

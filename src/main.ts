@@ -56,21 +56,15 @@ class ShaderApp {
             uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
         };
 
-        // エフェクトのパラメータをuniformsに追加
-        const effect = effectConfigs.find(e => e.name === this.currentEffect);
-        if (effect) {
-            Object.entries(effect.parameters).forEach(([name, config]) => {
-                const uniformName = `u${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-                uniforms[uniformName] = { value: config.value };
-            });
-        }
-
         // シェーダーマテリアルの作成
         this.material = new THREE.ShaderMaterial({
             vertexShader: vertexShader,
             fragmentShader: this.loadShader(this.currentEffect),
             uniforms: uniforms
         });
+
+        // 初期エフェクトのパラメータをuniformsに追加
+        this.initializeEffectUniforms(this.currentEffect);
 
         // ジオメトリとメッシュの作成
         this.geometry = new THREE.PlaneGeometry(2, 2);
@@ -140,7 +134,23 @@ class ShaderApp {
             'double_spiral_zoom': doubleSpiralZoomShader
         };
 
-        return shaders[effect.shader];
+        const shader = shaders[effect.shader];
+        if (!shader) {
+            console.error(`Shader not found for effect: ${effectName}`);
+            return spiralZoomShader; // フォールバック
+        }
+        return shader;
+    }
+
+    private initializeEffectUniforms(effectName: string): void {
+        const effect = effectConfigs.find(e => e.name === effectName);
+        if (!effect) return;
+
+        // エフェクトのパラメータをuniformsに追加
+        Object.entries(effect.parameters).forEach(([name, config]) => {
+            const uniformName = `u${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+            this.material.uniforms[uniformName] = { value: config.value };
+        });
     }
 
     private setupGUI(): void {
@@ -157,9 +167,10 @@ class ShaderApp {
     }
 
     private updateGUIParameters(): void {
-        // 既存のパラメータフォルダを削除
-        const folders = Array.from(this.gui.folders);
-        folders.forEach(folder => this.gui.removeFolder(folder));
+        // 既存のフォルダを削除
+        while (this.gui.folders.length > 0) {
+            this.gui.removeFolder(this.gui.folders[0]);
+        }
 
         // 現在のエフェクトのパラメータを設定
         const effect = effectConfigs.find(e => e.name === this.currentEffect);
@@ -168,9 +179,6 @@ class ShaderApp {
         const paramFolder = this.gui.addFolder('Parameters');
         Object.entries(effect.parameters).forEach(([name, config]) => {
             const uniformName = `u${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-            if (!this.material.uniforms[uniformName]) {
-                this.material.uniforms[uniformName] = { value: config.value };
-            }
             paramFolder.add(
                 this.material.uniforms[uniformName],
                 'value',
@@ -182,10 +190,21 @@ class ShaderApp {
     }
 
     private changeEffect(effectName: string): void {
+        console.log('Changing effect to:', effectName);
         this.currentEffect = effectName;
+        
+        // シェーダーの読み込みと設定
         const shader = this.loadShader(effectName);
+        console.log('Shader loaded:', !!shader);
+        
+        // 新しいエフェクトのuniformsを初期化
+        this.initializeEffectUniforms(effectName);
+        
+        // シェーダーの更新
         this.material.fragmentShader = shader;
         this.material.needsUpdate = true;
+        
+        // GUIの更新
         this.updateGUIParameters();
     }
 

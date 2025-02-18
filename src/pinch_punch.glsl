@@ -18,6 +18,7 @@
 
 // エフェクト固有のuniform変数
 uniform float uAlpha;     // ピンチ/パンチの強度（1.0より大きいとピンチ、小さいとパンチ）
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換

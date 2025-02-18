@@ -23,6 +23,7 @@ uniform float uAmpX;      // X方向の振幅
 uniform float uAmpY;      // Y方向の振幅
 uniform float uOmega;     // 波の周波数
 uniform float uPhase;     // 位相
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換

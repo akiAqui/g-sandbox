@@ -24,6 +24,7 @@
 // エフェクト固有のuniform変数
 uniform float uDelta;     // ズーム速度
 uniform float uK;         // 回転速度
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換

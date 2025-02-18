@@ -11,6 +11,7 @@
 // エフェクト固有のuniform変数
 uniform float uAmount;    // 渦の強さ
 uniform float uBeta;      // 非線形性パラメータ
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換

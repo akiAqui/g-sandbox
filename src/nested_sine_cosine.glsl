@@ -22,6 +22,7 @@
 uniform float uFreq1;     // 内側の周波数
 uniform float uFreq2;     // 外側の周波数
 uniform float uAmp;       // 振幅
+varying vec2 vUv;
 
 void main() {
     // UV座標を中心を原点として変換
