@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+// クラス外で型定義
+export type TextureType = (typeof TextureGenerator.TextureType)[keyof typeof TextureGenerator.TextureType];
+
 export class TextureGenerator {
     /**
      * テクスチャの種類を定義
@@ -9,7 +12,6 @@ export class TextureGenerator {
         GRID: 'grid',
         CONCENTRIC: 'concentric'
     } as const;
-    type TextureType = typeof TextureGenerator.TextureType[keyof typeof TextureGenerator.TextureType];
 
     /**
      * グリッドテクスチャを生成
