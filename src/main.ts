@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { GUI } from 'lil-gui';
-import { effectConfigs } from './effectConfigs';
+import { effectConfigs, type EffectConfig } from './shaderParameters';
+import { TextureGenerator } from './textureGenerator';
 import vertexShader from './vertex.glsl';
 
+// シェーダーのインポート
 import spiralZoomShader from './spiral_zoom.glsl';
 import twirlShader from './twirl.glsl';
 import pinchPunchShader from './pinch_punch.glsl';
@@ -21,9 +22,11 @@ class ShaderApp {
     private geometry: THREE.PlaneGeometry;
     private material: THREE.ShaderMaterial;
     private mesh: THREE.Mesh;
-    private gui: GUI;
     private clock: THREE.Clock;
     private currentEffect: string;
+    private isAnimationEnabled: boolean = true;
+    private timeScale: number = 1.0;
+    private currentTextureType: string = TextureGenerator.TextureType.GRID;
 
     constructor() {
         // Three.jsの初期設定
@@ -36,25 +39,42 @@ class ShaderApp {
         this.clock = new THREE.Clock();
 
         // レンダラーの設定
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setSize(window.innerWidth - 300, window.innerHeight);  // コントロールパネルの幅を考慮
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        document.body.appendChild(this.renderer.domElement);
+        document.getElementById('canvas-container')?.appendChild(this.renderer.domElement);
 
         // カメラの位置設定
         this.camera.position.z = 1;
 
-        // テクスチャの生成
-        const texture = this.createGridTexture();
-
-        // 初期エフェクトの設定
+        // 初期テクスチャとエフェクトの設定
         this.currentEffect = effectConfigs[0].name;
+        this.setupMaterial();
+        this.setupGeometry();
+        this.setupGUI();
+        this.setupEventListeners();
 
+        // アニメーションの開始
+        this.animate();
+    }
+
+    private setupMaterial(): void {
+        const texture = TextureGenerator.createTexture(this.currentTextureType as TextureType);
+        
         // 共通のuniforms
         const uniforms = {
             uTime: { value: 0 },
             uTexture: { value: texture },
-            uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+            uResolution: { value: new THREE.Vector2(window.innerWidth - 300, window.innerHeight) }
         };
+
+        // 現在のエフェクトのパラメータをuniformsに追加
+        const effect = effectConfigs.find(e => e.name === this.currentEffect);
+        if (effect) {
+            Object.entries(effect.parameters).forEach(([name, config]) => {
+                const uniformName = `u${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+                uniforms[uniformName] = { value: config.value };
+            });
+        }
 
         // シェーダーマテリアルの作成
         this.material = new THREE.ShaderMaterial({
@@ -62,65 +82,15 @@ class ShaderApp {
             fragmentShader: this.loadShader(this.currentEffect),
             uniforms: uniforms
         });
+    }
 
-        // 初期エフェクトのパラメータをuniformsに追加
-        this.initializeEffectUniforms(this.currentEffect);
-
-        // ジオメトリとメッシュの作成
+    private setupGeometry(): void {
         this.geometry = new THREE.PlaneGeometry(2, 2);
         this.mesh = new THREE.Mesh(this.geometry, this.material);
         this.scene.add(this.mesh);
-
-        // GUIの設定
-        this.setupGUI();
-
-        // イベントリスナーの設定
-        window.addEventListener('resize', this.onWindowResize.bind(this));
-        this.onWindowResize();
-
-        // アニメーションの開始
-        this.animate();
-    }
-
-    private createGridTexture(): THREE.Texture {
-        const size = 512;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d')!;
-
-        // 白背景
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, size, size);
-
-        // 水色のグリッド
-        ctx.strokeStyle = 'lightblue';
-        ctx.lineWidth = 1;
-        const gridSize = 32;
-
-        for (let i = 0; i <= size; i += gridSize) {
-            // 縦線
-            ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, size);
-            ctx.stroke();
-
-            // 横線
-            ctx.beginPath();
-            ctx.moveTo(0, i);
-            ctx.lineTo(size, i);
-            ctx.stroke();
-        }
-
-        const texture = new THREE.Texture(canvas);
-        texture.needsUpdate = true;
-        return texture;
     }
 
     private loadShader(effectName: string): string {
-        const effect = effectConfigs.find(e => e.name === effectName);
-        if (!effect) throw new Error(`Effect ${effectName} not found`);
-
         const shaders: Record<string, string> = {
             'spiral_zoom': spiralZoomShader,
             'twirl': twirlShader,
@@ -134,82 +104,168 @@ class ShaderApp {
             'double_spiral_zoom': doubleSpiralZoomShader
         };
 
-        const shader = shaders[effect.shader];
-        if (!shader) {
-            console.error(`Shader not found for effect: ${effectName}`);
-            return spiralZoomShader; // フォールバック
-        }
-        return shader;
-    }
-
-    private initializeEffectUniforms(effectName: string): void {
-        const effect = effectConfigs.find(e => e.name === effectName);
-        if (!effect) return;
-
-        // エフェクトのパラメータをuniformsに追加
-        Object.entries(effect.parameters).forEach(([name, config]) => {
-            const uniformName = `u${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-            this.material.uniforms[uniformName] = { value: config.value };
-        });
+        return shaders[effectName] || spiralZoomShader;
     }
 
     private setupGUI(): void {
-        this.gui = new GUI();
-
-        // エフェクト選択
-        const effectNames = effectConfigs.map(e => e.name);
-        this.gui.add({ effect: this.currentEffect }, 'effect', effectNames)
-            .name('Effect')
-            .onChange(this.changeEffect.bind(this));
-
-        // 初期エフェクトのパラメータ設定
-        this.updateGUIParameters();
-    }
-
-    private updateGUIParameters(): void {
-        // 既存のフォルダを削除
-        while (this.gui.folders.length > 0) {
-            this.gui.removeFolder(this.gui.folders[0]);
+        // エフェクトタブの生成
+        const tabContainer = document.getElementById('effect-tabs');
+        if (tabContainer) {
+            effectConfigs.forEach(effect => {
+                const button = document.createElement('button');
+                button.className = 'tab-button';
+                button.textContent = effect.label;
+                button.dataset.effect = effect.name;
+                if (effect.name === this.currentEffect) {
+                    button.classList.add('active');
+                }
+                tabContainer.appendChild(button);
+            });
         }
 
-        // 現在のエフェクトのパラメータを設定
-        const effect = effectConfigs.find(e => e.name === this.currentEffect);
-        if (!effect) return;
+        // パラメータグループの生成
+        const parameterContainers = document.getElementById('parameter-containers');
+        if (parameterContainers) {
+            effectConfigs.forEach(effect => {
+                const group = document.createElement('div');
+                group.className = `parameter-group ${effect.name === this.currentEffect ? 'active' : ''}`;
+                group.dataset.effect = effect.name;
 
-        const paramFolder = this.gui.addFolder('Parameters');
-        Object.entries(effect.parameters).forEach(([name, config]) => {
-            const uniformName = `u${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-            paramFolder.add(
-                this.material.uniforms[uniformName],
-                'value',
-                config.min,
-                config.max,
-                config.step
-            ).name(name);
+                Object.entries(effect.parameters).forEach(([name, config]) => {
+                    const param = document.createElement('div');
+                    param.className = 'parameter';
+                    
+                    const label = document.createElement('label');
+                    label.textContent = config.label || name;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'range';
+                    input.min = config.min.toString();
+                    input.max = config.max.toString();
+                    input.step = config.step.toString();
+                    input.value = config.value.toString();
+                    input.dataset.param = name;
+                    
+                    const value = document.createElement('span');
+                    value.className = 'value-display';
+                    value.textContent = config.value.toString();
+                    
+                    param.appendChild(label);
+                    param.appendChild(input);
+                    param.appendChild(value);
+                    group.appendChild(param);
+                });
+
+                parameterContainers.appendChild(group);
+            });
+        }
+
+        // テクスチャ選択の設定
+        const textureSelect = document.getElementById('texture-select') as HTMLSelectElement;
+        if (textureSelect) {
+            textureSelect.value = this.currentTextureType;
+        }
+
+        // アニメーション制御の設定
+        const timeScaleInput = document.getElementById('time-scale') as HTMLInputElement;
+        const animationCheckbox = document.getElementById('animation-enabled') as HTMLInputElement;
+        if (timeScaleInput && animationCheckbox) {
+            timeScaleInput.value = this.timeScale.toString();
+            animationCheckbox.checked = this.isAnimationEnabled;
+        }
+    }
+
+    private setupEventListeners(): void {
+        // エフェクト切り替え
+        document.getElementById('effect-tabs')?.addEventListener('click', (e) => {
+            const button = (e.target as HTMLElement).closest('.tab-button');
+            if (button && button.dataset.effect) {
+                this.changeEffect(button.dataset.effect);
+            }
         });
+
+        // パラメータ変更
+        document.getElementById('parameter-containers')?.addEventListener('input', (e) => {
+            const input = e.target as HTMLInputElement;
+            if (input.dataset.param) {
+                this.updateParameter(input.dataset.param, parseFloat(input.value));
+                // 値表示の更新
+                const display = input.nextElementSibling as HTMLElement;
+                if (display) {
+                    display.textContent = input.value;
+                }
+            }
+        });
+
+        // テクスチャ変更
+        document.getElementById('texture-select')?.addEventListener('change', (e) => {
+            const select = e.target as HTMLSelectElement;
+            this.changeTexture(select.value as TextureType);
+        });
+
+        // 時間制御
+        document.getElementById('time-scale')?.addEventListener('input', (e) => {
+            const input = e.target as HTMLInputElement;
+            this.timeScale = parseFloat(input.value);
+            const display = input.nextElementSibling as HTMLElement;
+            if (display) {
+                display.textContent = input.value;
+            }
+        });
+
+        document.getElementById('animation-enabled')?.addEventListener('change', (e) => {
+            const checkbox = e.target as HTMLInputElement;
+            this.isAnimationEnabled = checkbox.checked;
+        });
+
+        // ウィンドウリサイズ
+        window.addEventListener('resize', this.onWindowResize.bind(this));
     }
 
     private changeEffect(effectName: string): void {
-        console.log('Changing effect to:', effectName);
         this.currentEffect = effectName;
         
-        // シェーダーの読み込みと設定
-        const shader = this.loadShader(effectName);
-        console.log('Shader loaded:', !!shader);
-        
-        // 新しいエフェクトのuniformsを初期化
-        this.initializeEffectUniforms(effectName);
-        
+        // タブの更新
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.toggle('active', (button as HTMLElement).dataset.effect === effectName);
+        });
+
+        // パラメータグループの更新
+        document.querySelectorAll('.parameter-group').forEach(group => {
+            group.classList.toggle('active', (group as HTMLElement).dataset.effect === effectName);
+        });
+
         // シェーダーの更新
-        this.material.fragmentShader = shader;
+        this.material.fragmentShader = this.loadShader(effectName);
         this.material.needsUpdate = true;
-        
-        // GUIの更新
-        this.updateGUIParameters();
+
+        // uniformsの更新
+        const effect = effectConfigs.find(e => e.name === effectName);
+        if (effect) {
+            Object.entries(effect.parameters).forEach(([name, config]) => {
+                const uniformName = `u${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+                if (!this.material.uniforms[uniformName]) {
+                    this.material.uniforms[uniformName] = { value: config.value };
+                }
+            });
+        }
+    }
+
+    private updateParameter(paramName: string, value: number): void {
+        const uniformName = `u${paramName.charAt(0).toUpperCase()}${paramName.slice(1)}`;
+        if (this.material.uniforms[uniformName]) {
+            this.material.uniforms[uniformName].value = value;
+        }
+    }
+
+    private changeTexture(type: TextureType): void {
+        this.currentTextureType = type;
+        const texture = TextureGenerator.createTexture(type);
+        this.material.uniforms.uTexture.value = texture;
     }
 
     private onWindowResize(): void {
-        const width = window.innerWidth;
+        const width = window.innerWidth - 300;  // コントロールパネルの幅を考慮
         const height = window.innerHeight;
         
         this.renderer.setSize(width, height);
@@ -222,8 +278,10 @@ class ShaderApp {
 
     private animate(): void {
         requestAnimationFrame(this.animate.bind(this));
-        const time = this.clock.getElapsedTime();
-        this.material.uniforms.uTime.value = time;
+        if (this.isAnimationEnabled) {
+            const time = this.clock.getElapsedTime() * this.timeScale;
+            this.material.uniforms.uTime.value = time;
+        }
         this.renderer.render(this.scene, this.camera);
     }
 }
