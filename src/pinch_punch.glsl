@@ -18,6 +18,8 @@
 
 // エフェクト固有のuniform変数
 uniform float uAlpha;     // ピンチ/パンチの強度（1.0より大きいとピンチ、小さいとパンチ）
+uniform float uRateOfTime;
+
 varying vec2 vUv;
 
 void main() {
@@ -30,7 +32,7 @@ void main() {
     
     // Pinch/Punch変換の適用
     // 1. 半径の非線形変換
-    float rPrime = pow(r, uAlpha);
+    float rPrime = pow(r, uAlpha*(abs(sin(uTime))*1.5));
     
     // 2. 角度は変更なし
     float thetaPrime = theta;

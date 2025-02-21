@@ -81,8 +81,8 @@ export const effectConfigs = [
         name: 'zooming_swirl',
         shader: 'zooming_swirl',
         parameters: {
-            delta: { value: 0.1, min: 0.0, max: 0.5, step: 0.01 },
-            k: { value: 2.0, min: 0.0, max: 5.0, step: 0.1 }
+            delta: { value: 0.01, min: 0.01, max: 0.5, step: 0.001 },
+            k: { value: 2.0, min: 1.0, max: 5.0, step: 0.1 }
         }
     },
     {

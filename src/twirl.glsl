@@ -10,6 +10,7 @@
 
 // エフェクト固有のuniform変数
 uniform float uAmount;    // 渦の強さ
+uniform float uRateOfTime;
 uniform float uBeta;      // 非線形性パラメータ
 varying vec2 vUv;
 
@@ -24,9 +25,11 @@ void main() {
     // Twirl変換の適用
     // 1. 半径に応じた回転量の計算（非線形性を考慮）
     float rotation = uAmount * pow(r, uBeta);
+
+    float timeComponent = sin(uTime*uRateOfTime); // added by aki
     
     // 2. 角度の更新
-    float thetaPrime = theta + rotation;
+    float thetaPrime = theta + rotation*timeComponent; // mod by aki
     
     // 3. 半径は変更なし
     float rPrime = r;

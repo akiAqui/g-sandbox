@@ -19,6 +19,7 @@
 //   距離に応じた効果の強調
 
 // エフェクト固有のuniform変数
+uniform float uRateOfTime;
 uniform float uFreq1;     // 内側の周波数
 uniform float uFreq2;     // 外側の周波数
 uniform float uAmp;       // 振幅
@@ -50,8 +51,8 @@ void main() {
     uvPrime.y += displacement;
     
     // アニメーション効果の追加（時間による変調）
-    float timeEffect = sin(uTime * 0.5);
-    uvPrime.x += displacement * timeEffect * 0.2;
+    float timeEffect = sin(uTime * uRateOfTime);
+    uvPrime.x += displacement * timeEffect * 1.2;
     
     // エッジ処理
     float edge = smoothstep(1.0, 0.8, r);

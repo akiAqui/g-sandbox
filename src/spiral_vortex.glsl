@@ -82,7 +82,7 @@ void main() {
         );
         
         // 渦の中心付近での光の効果
-        float centerGlow = (1.0 - r) * decay * 0.5;
+        float centerGlow = (1.0 - r) * decay * 0.1;
         blendedColor += vec4(centerGlow);
         
         // エッジフェードの適用

@@ -11,6 +11,7 @@
 
 // エフェクト固有のuniform変数
 uniform float uK;         // 回転の強さ
+uniform float uRateOfTime;
 uniform float uAlpha;     // スケール係数
 uniform float uOmega;     // アニメーション速度
 uniform float uEpsilon;   // 小さな定数（0除算防止）
@@ -28,7 +29,7 @@ void main() {
     // 1. 対数関数による回転の適用
     float logComponent = log(r + uEpsilon);
     // 2. 時間による回転の適用
-    float timeComponent = uOmega * uTime;
+    float timeComponent = uOmega * uTime*uRateOfTime;
     // 3. 回転角の計算
     float thetaPrime = theta + uK * (logComponent + timeComponent);
     
