@@ -1,113 +1,75 @@
 import * as THREE from 'three';
 
-// クラス外で型定義
-export type TextureType = (typeof TextureGenerator.TextureType)[keyof typeof TextureGenerator.TextureType];
-
-export class TextureGenerator {
-    /**
-     * テクスチャの種類を定義
-     * 今後の拡張性を考慮して、TypeScriptの型として定義
-     */
-    static readonly TextureType = {
-        GRID: 'grid',
-        CONCENTRIC: 'concentric'
-    } as const;
-
-    /**
-     * グリッドテクスチャを生成
-     * - 白背景に水色のグリッド
-     * - サイズは512x512
-     * - グリッドの間隔は32px
-     */
-    static createGridTexture(): THREE.Texture {
-        const size = 512;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d')!;
-
-        // 白背景
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, size, size);
-
-        // 水色のグリッド
-        ctx.strokeStyle = 'lightblue';
-        ctx.lineWidth = 1;
-        const gridSize = 32;
-
-        for (let i = 0; i <= size; i += gridSize) {
-            // 縦線
-            ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, size);
-            ctx.stroke();
-
-            // 横線
-            ctx.beginPath();
-            ctx.moveTo(0, i);
-            ctx.lineTo(size, i);
-            ctx.stroke();
-        }
-
-        const texture = new THREE.Texture(canvas);
-        texture.needsUpdate = true;
-        return texture;
+export function createProceduralTexture(size: number): THREE.DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  
+  // 単一の青色の四角形を作成
+  const color = {
+    r: 50,   
+    g: 50,   
+    b: 255,  
+    a: 255
+  };
+  
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      data[i] = color.r;     
+      data[i + 1] = color.g; 
+      data[i + 2] = color.b; 
+      data[i + 3] = color.a; 
     }
+  }
+  
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  return texture;
+}
 
-    /**
-     * 同心円テクスチャを生成
-     * - 中心が赤で外側に向かって青にグラデーション
-     * - サイズは512x512
-     * - 円の数は20個
-     */
-    static createConcentricTexture(): THREE.Texture {
-        const size = 512;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d')!;
-
-        const centerX = size / 2;
-        const centerY = size / 2;
-        const maxRadius = Math.sqrt(2) * size / 2;  // 対角線の長さの半分
-        const circles = 20;  // 円の数
-
-        // 背景を白で塗りつぶし
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, size, size);
-
-        // 同心円を描画
-        for (let i = circles; i >= 0; i--) {
-            const radius = (i / circles) * maxRadius;
-            const ratio = i / circles;  // 0から1の値
-
-            // 赤から青へのグラデーション
-            const red = Math.floor(255 * (1 - ratio));
-            const blue = Math.floor(255 * ratio);
-            ctx.fillStyle = `rgb(${red}, 0, ${blue})`;
-
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        const texture = new THREE.Texture(canvas);
-        texture.needsUpdate = true;
-        return texture;
+export function createNormalMap(size: number): THREE.DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  
+  // グリッドのサイズを設定
+  const gridSize = size / 4; // 4x4のグリッドを作成
+  
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      
+      // グリッド内での相対位置を計算
+      const gridX = (x % gridSize) / gridSize;
+      const gridY = (y % gridSize) / gridSize;
+      
+      // グリッドの中心からの距離を計算
+      const dx = gridX - 0.5;
+      const dy = gridY - 0.5;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // グリッド位置に基づいて凹凸を決定
+      const isEvenGridX = Math.floor(x / gridSize) % 2 === 0;
+      const isEvenGridY = Math.floor(y / gridSize) % 2 === 0;
+      const shouldInvert = (isEvenGridX && isEvenGridY) || (!isEvenGridX && !isEvenGridY);
+      
+      // 法線の計算
+      let nx = dx * 0.5;
+      let ny = dy * 0.5;
+      let nz = Math.cos(distance * Math.PI) * (shouldInvert ? -1.0 : 1.0);
+      
+      // 正規化
+      const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      nx /= length;
+      ny /= length;
+      nz /= length;
+      
+      // [0, 255]の範囲にマッピング
+      data[i] = Math.floor((nx + 1) * 127.5);     // R
+      data[i + 1] = Math.floor((ny + 1) * 127.5); // G
+      data[i + 2] = Math.floor((nz + 1) * 127.5); // B
+      data[i + 3] = 255;                          // A
     }
-
-    /**
-     * テクスチャタイプに基づいて適切なテクスチャを生成
-     */
-    static createTexture(type: TextureType): THREE.Texture {
-        switch (type) {
-            case TextureGenerator.TextureType.GRID:
-                return this.createGridTexture();
-            case TextureGenerator.TextureType.CONCENTRIC:
-                return this.createConcentricTexture();
-            default:
-                console.warn(`Unknown texture type: ${type}, falling back to grid`);
-                return this.createGridTexture();
-        }
-    }
+  }
+  
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  return texture;
 }

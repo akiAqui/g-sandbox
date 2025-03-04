@@ -1,52 +1,42 @@
-precision mediump float;
+uniform sampler2D diffuseMap;
+uniform sampler2D normalMap;
+uniform vec3 lightPosition;
+uniform int lightType;
+uniform float lightIntensity;
 
-uniform sampler2D texture1;
-uniform vec2 a, b, c, d;
 varying vec2 vUv;
-
-vec2 mobiusTransform(vec2 z) {
-    vec2 num = a * z + b;
-    vec2 den = c * z + d;
-    return num / den;
-}
-
-vec3 inverseStereographicProjection(vec2 w) {
-    float modSq = dot(w, w);
-    modSq = min(modSq, 100.0); // 安定化
-    float Z = (1.0 - modSq) / (1.0 + modSq);
-    Z = clamp(Z, -0.9999, 0.9999); // Z の制限
-
-    return vec3(
-        2.0 * w.x / (1.0 + modSq),
-        2.0 * w.y / (1.0 + modSq),
-        Z
-    );
-}
-
-// ランベルト正積図法の適用
-vec2 lambertProjection(vec3 sphere) {
-    float lon = atan(sphere.z, sphere.x);
-    float lat = asin(sphere.y);
-    return vec2(
-        lon / (2.0 * 3.14159265359) + 0.5,
-        0.5 * (1.0 + sin(lat))
-    );
-}
+varying vec3 vNormal;
+varying vec3 vViewPosition;
 
 void main() {
-    // 1. UV座標を [-1,1] の複素平面として扱う
-    vec2 z = vUV * 2.0 - 1.0;
-
-    // 2. メビウス変換適用
-    vec2 transformed = mobiusTransform(z);
-
-    // 3. 逆ステレオ射影で球面座標へ
-    vec3 sphereCoords = inverseStereographicProjection(transformed);
-
-    // 4. ランベルト正積図法で投影
-    vec2 uv = lambertProjection(sphereCoords);
-
-    // 5. Three.js の `PlaneGeometry` のデフォルト UV 配置を修正
-    gl_FragColor = texture2D(texture1, vec2(uv.x, 1.0 - uv.y));
+  // テクスチャからの色取得
+  vec4 diffuseColor = texture2D(diffuseMap, vUv);
+  
+  // 法線マップからの法線取得と変換
+  vec3 normalColor = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
+  // 法線マップの影響を非常に強く
+  vec3 N = normalize(mix(vNormal, normalColor, 2.0));
+  
+  // ライティング計算
+  vec3 L = normalize(lightPosition - vViewPosition);
+  
+  // 拡散反射（より強調）
+  float diff = pow(max(dot(N, L), 0.0), 0.75) * 1.5;
+  vec3 diffuse = diffuseColor.rgb * diff * lightIntensity;
+  
+  // スペキュラ反射（より強く、より広く）
+  vec3 V = normalize(-vViewPosition);
+  vec3 H = normalize(L + V);
+  float spec = pow(max(dot(N, H), 0.0), 16.0) * 2.0;
+  vec3 specular = vec3(1.0) * spec * lightIntensity;
+  
+  // 環境光（暗めに）
+  vec3 ambient = diffuseColor.rgb * 0.1;
+  
+  // リムライティングの追加（輪郭強調）
+  float rim = 1.0 - max(dot(V, N), 0.0);
+  rim = pow(rim, 3.0);
+  vec3 rimLight = vec3(0.3) * rim * lightIntensity;
+  
+  gl_FragColor = vec4(ambient + diffuse + specular + rimLight, diffuseColor.a);
 }
-

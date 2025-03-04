@@ -1,127 +1,21 @@
 <!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>シェーダーエフェクトビューワー</title>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Procedural Normal Mapping</title>
     <style>
-        body {
-            margin: 0;
-            display: flex;
-            font-family: Arial, sans-serif;
-        }
-
-        #canvas-container {
-            flex: 1;
-            height: 100vh;
-        }
-
-        #control-panel {
-            width: 300px;
-            height: 100vh;
-            background: #f0f0f0;
-            padding: 20px;
-            box-sizing: border-box;
-            overflow-y: auto;
-        }
-
-        .tab-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-bottom: 20px;
-        }
-
-        .tab-button {
-            padding: 8px 12px;
-            border: none;
-            background: #ddd;
-            cursor: pointer;
-        }
-
-        .tab-button.active {
-            background: #666;
-            color: white;
-        }
-
-        .parameter-group {
-            display: none;
-            margin-bottom: 20px;
-        }
-
-        .parameter-group.active {
-            display: block;
-        }
-
-        .parameter {
-            margin: 10px 0;
-        }
-
-        .parameter label {
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .parameter input[type="range"] {
-            width: 100%;
-        }
-
-        .parameter .value-display {
-            font-size: 0.8em;
-            color: #666;
-        }
-
-        .texture-selector {
-            margin-bottom: 20px;
-        }
-
-        .texture-selector select {
-            width: 100%;
-            padding: 5px;
-        }
-
-        #time-control {
-            border-top: 1px solid #ddd;
-            padding-top: 20px;
-            margin-top: 20px;
-        }
+      body { margin: 0; }
+      #gui-container {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+      }
     </style>
-</head>
-<body>
-    <div id="canvas-container">
-        <!-- Three.jsのキャンバスがここに配置されます -->
-    </div>
-    
-    <div id="control-panel">
-        <div class="texture-selector">
-            <label for="texture-select">テクスチャ選択：</label>
-            <select id="texture-select">
-                <option value="grid">グリッド</option>
-                <option value="concentric">同心円</option>
-            </select>
-        </div>
-
-        <div class="tab-container" id="effect-tabs">
-            <!-- シェーダーのタブがここに動的に追加されます -->
-        </div>
-
-        <div id="parameter-containers">
-            <!-- 各シェーダーのパラメータグループがここに動的に追加されます -->
-        </div>
-
-        <div id="time-control">
-            <div class="parameter">
-                <label for="time-scale">時間スケール：</label>
-                <input type="range" id="time-scale" min="0" max="2" step="0.1" value="1">
-                <span class="value-display">1.0</span>
-            </div>
-            <div class="parameter">
-                <label for="animation-enabled">アニメーション：</label>
-                <input type="checkbox" id="animation-enabled" checked>
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="src/main.ts"></script>
-</body>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="gui-container"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>
