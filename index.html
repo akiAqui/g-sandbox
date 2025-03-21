@@ -1,21 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Procedural Normal Mapping</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Fractal Noise Visualization</title>
     <style>
-      body { margin: 0; }
-      #gui-container {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-      }
+        body { margin: 0; overflow: hidden; }
+        #gui { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.5); padding: 10px; color: white; }
     </style>
-  </head>
-  <body>
-    <div id="app"></div>
-    <div id="gui-container"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+</head>
+<body>
+    <div id="gui">
+        <label for="noise-type">Noise Type:</label>
+        <select id="noise-type">
+            <option value="perlin">Perlin</option>
+            <option value="simplex">Simplex</option>
+        </select><br><br>
+        <label for="octaves">Octaves:</label>
+        <input type="number" id="octaves" value="50" min="1" max="400"><br><br>
+        <label for="amplitude">Amplitude:</label>
+        <input type="range" id="amplitude" min="0.1" max="20" step="0.1" value="15.0"><br><br>
+        <label for="frequency">Frequency:</label>
+        <input type="range" id="frequency" min="1" max="4" step="0.1" value="5"><br><br>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+</body>
 </html>
+

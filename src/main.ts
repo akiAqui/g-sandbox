@@ -1,130 +1,130 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min';
-import { createProceduralTexture, createNormalMap } from './textureGenerator';
-
-// シェーダーのインポート
-import vertexShader from './vertex.glsl';
+import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls';
 import fragmentShader from './fragment.glsl';
+import vertexShader from './vertex.glsl';
 
-// シーンのセットアップ
+// 基本設定
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.z = 5;
+
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-document.getElementById('app')?.appendChild(renderer.domElement);
+document.body.appendChild(renderer.domElement);
 
-// カメラの位置設定
-camera.position.set(0, 0, 9);
-camera.lookAt(0, 0, 0);
+// TrackballControls
+const controls = new TrackballControls(camera, renderer.domElement);
 
 
-// コントロールの追加
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
+// アトラクタの定義 (最大3つまで、0 ~ 1 の範囲)
+const attractors = [
+  { position: new THREE.Vector3(0.75, 0.5, 0.0), strength: 1.0 },
+  { position: new THREE.Vector3(0.25, 0.5, 0.0), strength: 1.0 },
+  { position: new THREE.Vector3(0.5, 0.75, 0.0), strength: 1.0 }
+];
 
-// カメラの位置設定を以下のように変更してください
-camera.position.set(0, 0, 3);
-camera.lookAt(0, 0, 0);
-// ライトの設定
-const lights = {
-  pointLight: new THREE.PointLight(0xffffff, 1),
-  directionalLight: new THREE.DirectionalLight(0xffffff, 1),
-  spotLight: new THREE.SpotLight(0xffffff, 1),
-};
 
-// 初期ライトの設定
-lights.pointLight.position.set(5, 5, 5);
-lights.directionalLight.position.set(5, 5, 5);
-lights.spotLight.position.set(5, 5, 5);
-scene.add(lights.pointLight);
 
-// テクスチャの生成
-const textureSize = 512;
-const diffuseTexture = createProceduralTexture(textureSize);
-const normalTexture = createNormalMap(textureSize);
+// GUI要素の取得
+const noiseTypeSelect = document.getElementById('noise-type') as HTMLSelectElement;
+const octavesInput = document.getElementById('octaves') as HTMLInputElement;
+const amplitudeInput = document.getElementById('amplitude') as HTMLInputElement;
+const frequencyInput = document.getElementById('frequency') as HTMLInputElement;
 
-// マテリアルの作成
-const material = new THREE.ShaderMaterial({
-  uniforms: {
-    diffuseMap: { value: diffuseTexture },
-    normalMap: { value: normalTexture },
-    lightPosition: { value: new THREE.Vector3(5, 5, 5) },
-    lightType: { value: 0 }, // 0: point, 1: directional, 2: spot
-    lightIntensity: { value: 1.0 }
-  },
-  vertexShader,
-  fragmentShader
+// GUIのイベントリスナー
+noiseTypeSelect.addEventListener('change', () => {
+    material.uniforms.noiseType.value = noiseTypeSelect.value === 'perlin' ? 0 : 1;
 });
 
-// ジオメトリの作成と平面の追加
-const geometry = new THREE.PlaneGeometry(10, 10);
-const plane = new THREE.Mesh(geometry, material);
-scene.add(plane);
+octavesInput.addEventListener('input', () => {
+    material.uniforms.octaves.value = parseInt(octavesInput.value);
+});
+
+amplitudeInput.addEventListener('input', () => {
+    material.uniforms.amplitude.value = parseFloat(amplitudeInput.value);
+});
+
+frequencyInput.addEventListener('input', () => {
+    material.uniforms.frequency.value = parseFloat(frequencyInput.value);
+});
+
+// アトラクタ選択用変数
+let selectedAttractorIndex = -1;
+
+// マウスクリックイベントリスナー追加
+renderer.domElement.addEventListener('click', (event) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const clickPosition = new THREE.Vector3(x, y, 0);
+
+    // 最も近いアトラクタを選択
+    let minDistance = Infinity;
+    attractors.forEach((attractor, index) => {
+        const distance = clickPosition.distanceTo(attractor.position);
+        if (distance < minDistance && distance < 0.2) { // 0.2 は選択範囲の大きさを調整
+            minDistance = distance;
+            selectedAttractorIndex = index;
+        }
+    });
+
+    // アトラクタが選択された場合、その位置を更新
+    if (selectedAttractorIndex !== -1) {
+        // アトラクタ位置を更新 (NDC 座標系)
+        attractors[selectedAttractorIndex].position.set(x, y, 0);
+
+        // シェーダーへ更新を反映 (0 ~ 1 に変換)
+        material.uniforms.attractorPositions.value = attractors.flatMap(a => [
+            (a.position.x + 1) / 2,
+            (a.position.y + 1) / 2,
+            a.position.z
+        ]);
+    }
+});
 
 
 
-
-// GUIの設定
-const gui = new GUI({ container: document.getElementById('gui-container') });
-const lightControls = {
-  type: 'point',
-  intensity: 1.0,
-  position: { x: 5, y: 5, z: 5 }
-};
-
-gui.add(lightControls, 'type', ['point', 'directional', 'spot']).onChange((value) => {
-  scene.remove(lights.pointLight);
-  scene.remove(lights.directionalLight);
-  scene.remove(lights.spotLight);
-  
-  switch(value) {
-    case 'point':
-      scene.add(lights.pointLight);
-      material.uniforms.lightType.value = 0;
-      break;
-    case 'directional':
-      scene.add(lights.directionalLight);
-      material.uniforms.lightType.value = 1;
-      break;
-    case 'spot':
-      scene.add(lights.spotLight);
-      material.uniforms.lightType.value = 2;
-      break;
+// ジオメトリとマテリアル
+const geometry = new THREE.PlaneGeometry(2, 2);
+const material = new THREE.ShaderMaterial({
+  vertexShader,
+  fragmentShader,
+  uniforms: {
+    time: { value: 0.0 },
+    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+    attractorPositions: { value: attractors.flatMap(a => [a.position.x, a.position.y, a.position.z]) },
+    attractorStrengths: { value: attractors.map(a => a.strength) },
+    numAttractors: { value: attractors.length },
+    noiseType: { value: 0 },
+    octaves: { value: 5 },
+    amplitude: { value: 0.5 },
+    frequency: { value: 2.0 }
   }
 });
 
-gui.add(lightControls, 'intensity', 0, 2).onChange((value) => {
-  material.uniforms.lightIntensity.value = value;
-  Object.values(lights).forEach(light => light.intensity = value);
-});
+console.log("Attractor Positions:", attractors.flatMap(a => [a.position.x, a.position.y, a.position.z]));
 
-const positionFolder = gui.addFolder('Light Position');
-positionFolder.add(lightControls.position, 'x', -30, 30).onChange(updateLightPosition);
-positionFolder.add(lightControls.position, 'y', -30, 30).onChange(updateLightPosition);
-positionFolder.add(lightControls.position, 'z', -30, 30).onChange(updateLightPosition);
 
-function updateLightPosition() {
-  const pos = new THREE.Vector3(
-    lightControls.position.x,
-    lightControls.position.y,
-    lightControls.position.z
-  );
-  material.uniforms.lightPosition.value = pos;
-  Object.values(lights).forEach(light => light.position.copy(pos));
-}
 
-// アニメーションループ
-function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
-}
-animate();
+const plane = new THREE.Mesh(geometry, material);
+scene.add(plane);
 
 // リサイズ対応
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  material.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
 });
+
+// アニメーションループ
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  material.uniforms.time.value += 0.01;
+  renderer.render(scene, camera);
+}
+
+animate();
+
