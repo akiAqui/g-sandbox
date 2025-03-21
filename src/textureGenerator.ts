@@ -1,9 +1,25 @@
 import * as THREE from 'three';
 
+//
+// 単一の青色の四角形で指定サイズのテクスチャを生成
+//
+// Uint8Array:0-255
+//
+//  8bit: 256 128  64  32  16   8   4   2  -1  -> 255 max
+//          0   0   0   0   0   0   0   0
+//
+// dataはTypedArrayである必要がある
+//
+// DataTexture( data,
+//              width,
+//              height,
+//              format,
+//              type,
+//              mapping, wrapS, wrapT, magFilter, minFilter, anisotropy, colorSpace )
+
+
 export function createProceduralTexture(size: number): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
-  
-  // 単一の青色の四角形を作成
   const color = {
     r: 50,   
     g: 50,   
@@ -14,7 +30,7 @@ export function createProceduralTexture(size: number): THREE.DataTexture {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      data[i] = color.r;     
+      data[i    ] = color.r;     
       data[i + 1] = color.g; 
       data[i + 2] = color.b; 
       data[i + 3] = color.a; 

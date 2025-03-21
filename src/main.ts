@@ -15,7 +15,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.getElementById('app')?.appendChild(renderer.domElement);
 
 // カメラの位置設定
-camera.position.set(0, 0, 3);
+camera.position.set(0, 0, 9);
 camera.lookAt(0, 0, 0);
 
 
@@ -61,6 +61,9 @@ const material = new THREE.ShaderMaterial({
 const geometry = new THREE.PlaneGeometry(10, 10);
 const plane = new THREE.Mesh(geometry, material);
 scene.add(plane);
+
+
+
 
 // GUIの設定
 const gui = new GUI({ container: document.getElementById('gui-container') });
