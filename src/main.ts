@@ -16,11 +16,11 @@ document.body.appendChild(renderer.domElement);
 const controls = new TrackballControls(camera, renderer.domElement);
 
 
-// アトラクタの定義 (最大3つまで、0 ~ 1 の範囲)
+// アトラクタの定義 (3つ、0 ~ 1 の範囲)
 const attractors = [
-  { position: new THREE.Vector3(0.75, 0.5, 0.0), strength: 1.0 },
-  { position: new THREE.Vector3(0.25, 0.5, 0.0), strength: 1.0 },
-  { position: new THREE.Vector3(0.5, 0.75, 0.0), strength: 1.0 }
+  { position: new THREE.Vector3(0.75, 0.5, 0.0), strength: -1.5 },
+  { position: new THREE.Vector3(0.15, 0.5, 0.0), strength: 1.2 },
+  { position: new THREE.Vector3(0.5, 0.75, 0.0), strength: 0.7 }
 ];
 
 
@@ -97,7 +97,7 @@ const material = new THREE.ShaderMaterial({
     attractorStrengths: { value: attractors.map(a => a.strength) },
     numAttractors: { value: attractors.length },
     noiseType: { value: 0 },
-    octaves: { value: 5 },
+    octaves: { value: 3 },
     amplitude: { value: 0.5 },
     frequency: { value: 2.0 }
   }
