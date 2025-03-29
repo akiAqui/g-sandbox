@@ -18,13 +18,13 @@ const controls = new TrackballControls(camera, renderer.domElement);
 
 // アトラクタの定義 (3つ、0 ~ 1 の範囲)
 const attractors = [
-  { position: new THREE.Vector3(0.75, 0.5, 0.0), strength: -1.5 },
+  { position: new THREE.Vector3(0.75, 0.5, 0.0), strength: -0.9 },
   { position: new THREE.Vector3(0.15, 0.5, 0.0), strength: 1.2 },
   { position: new THREE.Vector3(0.5, 0.75, 0.0), strength: 0.7 }
 ];
 
 
-
+/*
 // GUI要素の取得
 const noiseTypeSelect = document.getElementById('noise-type') as HTMLSelectElement;
 const octavesInput = document.getElementById('octaves') as HTMLInputElement;
@@ -47,7 +47,7 @@ amplitudeInput.addEventListener('input', () => {
 frequencyInput.addEventListener('input', () => {
     material.uniforms.frequency.value = parseFloat(frequencyInput.value);
 });
-
+*/
 // アトラクタ選択用変数
 let selectedAttractorIndex = -1;
 

@@ -73,19 +73,20 @@ float potential(vec3 pos) {
             attractorPositions[i * 3 + 2]
         );
         
-        vec3 diff = pos - attractorPos;       // 方向ベクトル
-        vec2 dir = normalize(diff.xy);           // 方向ベクトルを正規化
-        float angle = atan(dir.y, dir.x);     // diff の角度を取得
-        float distortion = cos(angle);  // 2.0 は歪みの強さを調整する定数
-        float dist = length(diff);         //オリジナル正円ポテンシャル
-        total += attractorStrengths[i]*dist;
+        vec3  diff         = pos - attractorPos;       // 方向ベクトル
+        vec2  dir          = normalize(diff.xy);           // 方向ベクトルを正規化
+        float angle        = atan(dir.y, dir.x);     // diff の角度を取得
+        float distortion   = cos(angle);  // 2.0 は歪みの強さを調整する定数
+        float dist         = length(diff);         //オリジナル正円ポテンシャル
+        total             += attractorStrengths[i]*dist;
     }
     return total;
 }
 /* color map + line */
 void main() {
     vec2 uv = gl_FragCoord.xy / resolution.xy;
-    float minDist = 100.0;
+    float minDist = 1.0;
+    float dist;
     // ポテンシャル場の計算
     float potentialValue = 0.0;
     for (int i = 0; i < numAttractors; i++) {
@@ -95,12 +96,12 @@ void main() {
             attractorPositions[i * 3 + 2]
         );
         
-        vec2    dir = attractorPos.xy - uv;
-        vec2   ndir = normalize(dir);
-        float angle = atan(ndir.y/ndir.x);
-        float  dist = length(dir);
-        minDist = min(minDist,dist);
-        float warp = abs(cos(angle*10.0)+2.0)*0.3;
+        vec2    dir     = attractorPos.xy - uv;
+        vec2   ndir     = normalize(dir);
+        float angle     = atan(ndir.y/ndir.x);
+        dist     = length(dir);
+        minDist         = min(minDist,dist);
+        float warp      = abs(cos(angle*10.0)+2.0)*0.3;
         potentialValue += attractorStrengths[i] / (dist + 0.001) + warp;
 
     }
@@ -133,7 +134,7 @@ void main() {
     // 等高線の間隔を調整（値が大きいほど線が密になる）
     float contourFrequency = 5.7;
     // 線の幅を調整（値が小さいほど線が細くなる）
-    float contourWidth = 0.9;
+    float contourWidth = 0.8;
 
 
     // 近距離用の関数（小さい値では頻度が低い）
@@ -149,11 +150,12 @@ void main() {
     float localFrequency = contourFrequency * frequencyFactor;
 
     
-    float contourPattern = fract(potentialValue * localFrequency+fract(time*2.0/3.0));
-    // float contourPattern = fract(potentialValue * contourFrequency);
+    //float contourPattern = fract(potentialValue * localFrequency+fract(time*2.0/3.0));
+    //float contourPattern = fract(potentialValue * contourFrequency - time);
+    float   contourPattern = fract(potentialValue * localFrequency -(+time));
     
-    float contourLine = smoothstep(0.0, contourWidth, contourPattern) * 
-      smoothstep(contourWidth * 2.0, contourWidth, contourPattern);//
+    float contourLine = smoothstep(0.0, contourWidth, contourPattern) * smoothstep(contourWidth * 2.0, contourWidth, contourPattern);
+      
     
     // 線の鮮明さを強調
     contourLine = pow(contourLine, 0.5);
@@ -163,7 +165,7 @@ void main() {
     
     // 背景色と線の色を合成
     vec3 finalColor = mix(backgroundColor, lineColor, contourLine);
-    if (minDist<0.02) {
+    if (minDist<0.003) {
       finalColor=backgroundColor;
     }
     gl_FragColor = vec4(finalColor, 1.0);
