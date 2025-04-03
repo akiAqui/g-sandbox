@@ -1,243 +1,295 @@
 import * as THREE from 'three';
-import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls';
-import fragmentShader from './fragment.glsl';
-import vertexShader from './vertex.glsl';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
+import { GUI } from 'dat.gui';
 
-// 基本設定
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = 5;
+// シェーダーのインポート
+import vertexShader from '/src/shaders/vertex.glsl';
+import fragmentShader from '/src/shaders/fragment.glsl';
+import chromaticAberrationFragmentShader from '/src/shaders/chromaticAberration.glsl';
+import chromaticAberrationVertexShader from '/src/shaders/chromaticAberrationVertex.glsl';
 
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+class FluidArtSimulation {
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private renderer: THREE.WebGLRenderer;
+  private geometry: THREE.PlaneGeometry;
+  private material: THREE.ShaderMaterial;
+  private mesh: THREE.Mesh;
+  private clock: THREE.Clock;
+  private controls: OrbitControls;
+  private composer: EffectComposer;
+  private bloomPass: UnrealBloomPass;
+  private chromaticAberrationPass: ShaderPass;
+  private lastMousePosition: { x: number, y: number } = { x: 0, y: 0 };
+  private mousePosition: { x: number, y: number } = { x: 0, y: 0 };
+  private mouseVelocity: { x: number, y: number } = { x: 0, y: 0 };
+  private gui: GUI;
+  private params = {
+    bloomEnabled: true,
+    chromaticAberrationEnabled: true,
+    bloomStrength: 1.5,
+    bloomRadius: 0.4,
+    bloomThreshold: 0.2,
+    chromaticAberrationStrength: 0.5,
+    noiseScale: 1.5,
+    noiseIntensity: 0.5,
+    fluidIntensity: 0.8,
+    colorIntensity: 1.2,
+    colorA: '#3a0ca3', // 深い青/紫
+    colorB: '#f72585', // マゼンタ/ピンク
+    colorC: '#4cc9f0', // 水色/シアン
+    colorD: '#ffd166', // 黄色/金
+  };
 
-// TrackballControls
-const controls = new TrackballControls(camera, renderer.domElement);
-
-
-// アトラクタの定義 (3つ、0 ~ 1 の範囲)
-const attractors = [
-  { position: new THREE.Vector3(0.75, 0.5, 0.0), strength:  0.9 },
-  { position: new THREE.Vector3(0.15, 0.5, 0.0), strength: -0.9 },
-  { position: new THREE.Vector3(0.5,  0.75, 0.0), strength: 0.7 },
-  { position: new THREE.Vector3(0.25, 0.15, 0.0), strength: -0.7 }  
-];
-
-const patternTypeSelect=document.getElementById('pattern-type') as HTMLSelectElement;
-patternTypeSelect.addEventListener('change',()=>{
-  material.uniforms.patternType.value=parseInt(patternTypeSelect.value);
-});
-
-//
-// UI制御
-//
-const uiElements = document.querySelectorAll(".ui-element");
-const canvas = document.querySelector("canvas")!;
-const hideBtn = document.getElementById("hide-ui")!;
-
-// 現在の表示状態をチェックして切り替え
-function toggleUI() {
-  const hidden = uiElements[0].style.display === "none";
-  uiElements.forEach(el => {
-    (el as HTMLElement).style.display = hidden ? "" : "none";
-  });
-}
-
-// タッチイベントで2本指検出
-window.addEventListener("touchstart", (e) => {
-  if (e.touches.length === 2) {
-    e.preventDefault(); // ジェスチャー拡大防止（必要に応じて）
-    toggleUI();
+  constructor() {
+    // シーンのセットアップ
+    this.scene = new THREE.Scene();
+    
+    // カメラのセットアップ
+    this.camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    this.camera.position.z = 1;
+    
+    // レンダラーのセットアップ
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(this.renderer.domElement);
+    
+    // コントロールのセットアップ
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    
+    // 時間管理用のクロック
+    this.clock = new THREE.Clock();
+    
+    // ジオメトリとマテリアルの作成
+    this.createMeshWithShaders();
+    
+    // ポストプロセッシングの設定
+    this.setupPostProcessing();
+    
+    // GUI設定
+    this.setupGUI();
+    
+    // リサイズイベントのリスナー
+    window.addEventListener('resize', this.handleResize.bind(this));
+    
+    // マウスイベントのリスナー
+    window.addEventListener('mousemove', this.handleMouseMove.bind(this));
+    
+    // アニメーションループの開始
+    this.animate();
   }
-}, { passive: false });
 
-
-
-// UI全体を非表示
-function hideUI() {
-  uiElements.forEach(el => {
-    (el as HTMLElement).style.display = "none";
-  });
-}
-
-// UI全体を再表示
-function showUI() {
-  uiElements.forEach(el => {
-    (el as HTMLElement).style.display = "";
-  });
-}
-
-// キャプチャ処理
-hideBtn.addEventListener("click", async () => {
-  hideUI();
-
-  // フレーム待ち
-  //await new Promise(requestAnimationFrame);
-  // canvasキャプチャ
-  //  const dataURL = canvas.toDataURL("image/png");
-  //  downloadImage(dataURL);
-
-  // UIは表示せず、ダブルクリック待ち
-});
-
-// ダブルクリックでUIを表示
-window.addEventListener("dblclick", () => {
-  showUI();
-});
-
-// ダウンロード処理
-//function downloadImage(dataUrl: string) {
-//  const a = document.createElement("a");
-//  a.href = dataUrl;
-//  a.download = "capture.png";
-//  a.click();
-//}
-
-
-
-
-/*
-// GUI要素の取得
-const noiseTypeSelect = document.getElementById('noise-type') as HTMLSelectElement;
-const octavesInput = document.getElementById('octaves') as HTMLInputElement;
-const amplitudeInput = document.getElementById('amplitude') as HTMLInputElement;
-const frequencyInput = document.getElementById('frequency') as HTMLInputElement;
-
-// GUIのイベントリスナー
-noiseTypeSelect.addEventListener('change', () => {
-    material.uniforms.noiseType.value = noiseTypeSelect.value === 'perlin' ? 0 : 1;
-});
-
-octavesInput.addEventListener('input', () => {
-    material.uniforms.octaves.value = parseInt(octavesInput.value);
-});
-
-amplitudeInput.addEventListener('input', () => {
-    material.uniforms.amplitude.value = parseFloat(amplitudeInput.value);
-});
-
-frequencyInput.addEventListener('input', () => {
-    material.uniforms.frequency.value = parseFloat(frequencyInput.value);
-});
-*/
-// アトラクタ選択用変数
-let selectedAttractorIndex = -1;
-
-// マウスクリックイベントリスナー追加
-renderer.domElement.addEventListener('click', (event) => {
-    const rect = renderer.domElement.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    const clickPosition = new THREE.Vector3(x, y, 0);
-
-    // 最も近いアトラクタを選択
-    let minDistance = Infinity;
-    attractors.forEach((attractor, index) => {
-        const distance = clickPosition.distanceTo(attractor.position);
-        if (distance < minDistance && distance < 0.2) { // 0.2 は選択範囲の大きさを調整
-            minDistance = distance;
-            selectedAttractorIndex = index;
-        }
+  private createMeshWithShaders(): void {
+    this.geometry = new THREE.PlaneGeometry(2, 2, 128, 128);
+    
+    // シェーダーマテリアルの作成
+    this.material = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms: {
+        uTime: { value: 0 },
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        uMouse: { value: new THREE.Vector2(0, 0) },
+        uMouseVelocity: { value: new THREE.Vector2(0, 0) },
+        uColorA: { value: new THREE.Color(this.params.colorA) },
+        uColorB: { value: new THREE.Color(this.params.colorB) },
+        uColorC: { value: new THREE.Color(this.params.colorC) },
+        uColorD: { value: new THREE.Color(this.params.colorD) },
+        uNoiseScale: { value: this.params.noiseScale },
+        uNoiseIntensity: { value: this.params.noiseIntensity },
+        uFluidIntensity: { value: this.params.fluidIntensity },
+        uColorIntensity: { value: this.params.colorIntensity },
+      }
     });
+    
+    // メッシュの作成とシーンへの追加
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.scene.add(this.mesh);
+  }
 
-    // アトラクタが選択された場合、その位置を更新
-    if (selectedAttractorIndex !== -1) {
-        // アトラクタ位置を更新 (NDC 座標系)
-        attractors[selectedAttractorIndex].position.set(x, y, 0);
+  private setupPostProcessing(): void {
+    // レンダーターゲットの作成
+    const renderTarget = new THREE.WebGLRenderTarget(
+      window.innerWidth, 
+      window.innerHeight, 
+      {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        encoding: THREE.sRGBEncoding
+      }
+    );
+    
+    // エフェクトコンポーザーの作成
+    this.composer = new EffectComposer(this.renderer, renderTarget);
+    
+    // レンダーパスの追加
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
+    
+    // ブルームエフェクトの追加
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      this.params.bloomStrength,
+      this.params.bloomRadius,
+      this.params.bloomThreshold
+    );
+    this.composer.addPass(this.bloomPass);
+    
+    // 色収差エフェクトの追加
+    this.chromaticAberrationPass = new ShaderPass({
+      uniforms: {
+        tDiffuse: { value: null },
+        uStrength: { value: this.params.chromaticAberrationStrength },
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+      },
+      vertexShader: chromaticAberrationVertexShader,
+      fragmentShader: chromaticAberrationFragmentShader
+    });
+    this.composer.addPass(this.chromaticAberrationPass);
+  }
 
-        // シェーダーへ更新を反映 (0 ~ 1 に変換)
-        material.uniforms.attractorPositions.value = attractors.flatMap(a => [
-            (a.position.x + 1) / 2,
-            (a.position.y + 1) / 2,
-            a.position.z
-        ]);
+  private setupGUI(): void {
+    this.gui = new GUI();
+    
+    // エフェクト設定フォルダ
+    const effectsFolder = this.gui.addFolder('ポストエフェクト');
+    
+    // ブルームエフェクト設定
+    effectsFolder.add(this.params, 'bloomEnabled').name('ブルーム効果').onChange(() => {
+      this.bloomPass.enabled = this.params.bloomEnabled;
+    });
+    
+    effectsFolder.add(this.params, 'bloomStrength', 0, 3, 0.01).name('ブルーム強度').onChange((value) => {
+      this.bloomPass.strength = value;
+    });
+    
+    effectsFolder.add(this.params, 'bloomRadius', 0, 1, 0.01).name('ブルーム半径').onChange((value) => {
+      this.bloomPass.radius = value;
+    });
+    
+    effectsFolder.add(this.params, 'bloomThreshold', 0, 1, 0.01).name('ブルーム閾値').onChange((value) => {
+      this.bloomPass.threshold = value;
+    });
+    
+    // 色収差エフェクト設定
+    effectsFolder.add(this.params, 'chromaticAberrationEnabled').name('色収差効果').onChange(() => {
+      this.chromaticAberrationPass.enabled = this.params.chromaticAberrationEnabled;
+    });
+    
+    effectsFolder.add(this.params, 'chromaticAberrationStrength', 0, 2, 0.01).name('色収差強度').onChange((value) => {
+      this.chromaticAberrationPass.uniforms.uStrength.value = value;
+    });
+    
+    effectsFolder.open();
+    
+    // シェーダーパラメータフォルダ
+    const shaderFolder = this.gui.addFolder('シェーダーパラメータ');
+    
+    shaderFolder.add(this.params, 'noiseScale', 0.1, 5, 0.1).name('ノイズスケール').onChange((value) => {
+      this.material.uniforms.uNoiseScale.value = value;
+    });
+    
+    shaderFolder.add(this.params, 'noiseIntensity', 0, 2, 0.1).name('ノイズ強度').onChange((value) => {
+      this.material.uniforms.uNoiseIntensity.value = value;
+    });
+    
+    shaderFolder.add(this.params, 'fluidIntensity', 0, 2, 0.1).name('流体強度').onChange((value) => {
+      this.material.uniforms.uFluidIntensity.value = value;
+    });
+    
+    shaderFolder.add(this.params, 'colorIntensity', 0, 3, 0.1).name('色彩強度').onChange((value) => {
+      this.material.uniforms.uColorIntensity.value = value;
+    });
+    
+    shaderFolder.open();
+    
+    // カラーパレットフォルダ
+    const colorFolder = this.gui.addFolder('カラーパレット');
+    
+    colorFolder.addColor(this.params, 'colorA').name('色 A').onChange((value) => {
+      this.material.uniforms.uColorA.value.set(value);
+    });
+    
+    colorFolder.addColor(this.params, 'colorB').name('色 B').onChange((value) => {
+      this.material.uniforms.uColorB.value.set(value);
+    });
+    
+    colorFolder.addColor(this.params, 'colorC').name('色 C').onChange((value) => {
+      this.material.uniforms.uColorC.value.set(value);
+    });
+    
+    colorFolder.addColor(this.params, 'colorD').name('色 D').onChange((value) => {
+      this.material.uniforms.uColorD.value.set(value);
+    });
+    
+    colorFolder.open();
+  }
+
+  private handleResize(): void {
+    // ウィンドウサイズ変更時の処理
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+    this.composer.setSize(width, height);
+    
+    if (this.material.uniforms.uResolution) {
+      this.material.uniforms.uResolution.value.set(width, height);
     }
-});
-
-
-
-// ジオメトリとマテリアル
-//
-// 注意：
-// uniformsに渡す変数をミュータブルに操作したい場合、
-// 事前に配列変数を定義し、その参照を uniform.value に渡す必要がある
-//
-//
-//const attractorPositionsArray = attractors.flatMap(a => [a.position.x, a.position.y, a.position.z]);
-//const attractorStrengthsArray = attractors.map(a => a.strength);
-//
-// ShaderMaterialで「参照渡し!」をする
-//
-//const material = new THREE.ShaderMaterial({
-//  vertexShader,
-//  fragmentShader,
-//  uniforms: {
-//    attractorPositions: { value: attractorPositionsArray },
-//    attractorStrengths: { value: attractorStrengthsArray },
-//
-// その後変更するときは
-//
-// attractorPositionsArray[0] += 0.01;
-// attractorStrengthsArray[1] = 1.5;
-//
-// のようにするのもわかりやすい
-
-
-
-
-
-const geometry = new THREE.PlaneGeometry(2, 2);
-const material = new THREE.ShaderMaterial({
-  vertexShader,
-  fragmentShader,
-  uniforms: {
-    time: { value: 0.0 },
-    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-    attractorPositions: { value: attractors.flatMap(a => [a.position.x, a.position.y, a.position.z]) },
-    attractorStrengths: { value: attractors.map(a => a.strength) },
-    numAttractors: { value: attractors.length },
-    patternType:   { value: 0},
-    noiseType: { value: 0 },
-    octaves: { value: 3 },
-    amplitude: { value: 0.5 },
-    frequency: { value: 2.0 }
+    
+    if (this.chromaticAberrationPass.uniforms.uResolution) {
+      this.chromaticAberrationPass.uniforms.uResolution.value.set(width, height);
+    }
   }
-});
 
-console.log("Attractor Positions:", attractors.flatMap(a => [a.position.x, a.position.y, a.position.z]));
-
-
-
-const plane = new THREE.Mesh(geometry, material);
-scene.add(plane);
-
-// リサイズ対応
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  material.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
-});
-
-// アニメーションループ
-function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
-  material.uniforms.time.value += 0.01;
-  //material.uniforms.attractorPositions.value[0] = (material.uniforms.attractorPositions.value[0] + 0.001) % 1;
-  //material.uniforms.attractorPositions.value[1] = (material.uniforms.attractorPositions.value[1] + 0.001) % 1;
-
-  if (material.uniforms.patternType.value == 0) {
-    // 下記の2行は、xの値と、1-xを行ったり来たりするので一つあるはずのアトラクタが二つに見える！！！これ凄い！
-    material.uniforms.attractorPositions.value[0] = Math.abs((material.uniforms.attractorPositions.value[0] ) % 2 - 1);
-    material.uniforms.attractorPositions.value[1] = Math.abs((material.uniforms.attractorPositions.value[1] ) % 2 - 1);
-    material.uniforms.attractorStrengths.value[0]=1.5*Math.sin(material.uniforms.time.value);
+  private handleMouseMove(event: MouseEvent): void {
+    // 前回のマウス位置を保存
+    this.lastMousePosition.x = this.mousePosition.x;
+    this.lastMousePosition.y = this.mousePosition.y;
+    
+    // 現在のマウス位置を更新（-1 ~ 1の範囲に正規化）
+    this.mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+    this.mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // マウスの速度を計算
+    this.mouseVelocity.x = this.mousePosition.x - this.lastMousePosition.x;
+    this.mouseVelocity.y = this.mousePosition.y - this.lastMousePosition.y;
+    
+    // uniforms に値を設定
+    this.material.uniforms.uMouse.value.set(this.mousePosition.x, this.mousePosition.y);
+    this.material.uniforms.uMouseVelocity.value.set(this.mouseVelocity.x, this.mouseVelocity.y);
   }
-  
-  renderer.render(scene, camera);
+
+  private animate(): void {
+    requestAnimationFrame(this.animate.bind(this));
+    
+    // 時間の更新
+    const elapsedTime = this.clock.getElapsedTime();
+    this.material.uniforms.uTime.value = elapsedTime;
+    
+    // コントロールの更新
+    this.controls.update();
+    
+    // エフェクトコンポーザーでレンダリング
+    this.composer.render();
+  }
 }
 
-animate();
-
+// アプリケーションの開始
+window.addEventListener('DOMContentLoaded', () => {
+  new FluidArtSimulation();
+});
