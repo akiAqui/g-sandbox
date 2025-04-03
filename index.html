@@ -5,25 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Three.js Fractal Noise Visualization</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        #gui { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.5); padding: 10px; color: white; }
+      body {
+          margin: 0;
+          overflow: hidden;
+      }
+      #ui-bar {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          display: flex;
+          height: 30px;
+          align-items: stretch;
+          gap: 8px;
+          background: transparent;       /* ← 背景透明化 */
+          z-index: 10;                   /* ← コンテンツ上に配置 */
+      }
+      
+      #gui,
+      #hide-ui {
+          display: flex;
+          align-items: center;           /* ← 垂直中央に寄せる */
+          border-radius: 8px;
+          background: rgba(0, 0, 0, 0.5);
+          color: white;
+          font-size: 1em;
+          line-height: 1.2;
+          padding: 0 12px;               /* ← 上下paddingは0、左右だけ */
+          height: 100%;
+          box-sizing: border-box;        /* ← padding含めて高さ50px */
+          border: none;
+      }
     </style>
 </head>
 <body>
-    <!-- <div id="gui"> -->
-    <!--     <label for="noise-type">Noise Type:</label> -->
-    <!--     <select id="noise-type"> -->
+  <div id="ui-bar">
+    <div id="gui" class="ui-element">
+      <label for="pattern-type">Pattern:&nbsp;&nbsp; </label>
+      <select id="pattern-type">
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
+    </div>
+    <button class="ui-element" id="hide-ui">hide UI</button>
+  </div>
+  
+  <!--     <label for="noise-type">Noise Type:</label> -->
+  <!--     <select id="noise-type"> -->
     <!--         <option value="perlin">Perlin</option> -->
     <!--         <option value="simplex">Simplex</option> -->
     <!--     </select><br><br> -->
-    <!--     <label for="octaves">Octaves:</label> -->
-    <!--     <input type="number" id="octaves" value="3" min="1" max="40"><br><br> -->
-    <!--     <label for="amplitude">Amplitude:</label> -->
-    <!--     <input type="range" id="amplitude" min="0.1" max="20" step="0.1" value="0.5"><br><br> -->
-    <!--     <label for="frequency">Frequency:</label> -->
-    <!--     <input type="range" id="frequency" min="1" max="10" step="0.1" value="2"><br><br> -->
-    <!-- </div> -->
-    <script type="module" src="./src/main.ts"></script>
+  <!--     <label for="octaves">Octaves:</label> -->
+  <!--     <input type="number" id="octaves" value="3" min="1" max="40"><br><br> -->
+  <!--     <label for="amplitude">Amplitude:</label> -->
+  <!--     <input type="range" id="amplitude" min="0.1" max="20" step="0.1" value="0.5"><br><br> -->
+  <!--     <label for="frequency">Frequency:</label> -->
+  <!--     <input type="range" id="frequency" min="1" max="10" step="0.1" value="2"><br><br> -->
+  <!-- </div> -->
+<script type="module" src="./src/main.ts"></script>
 </body>
 </html>
 

@@ -5,9 +5,10 @@ uniform int noiseType;
 uniform int octaves;
 uniform float amplitude;
 uniform float frequency;
-uniform float attractorPositions[9];  // 3つのアトラクタを格納 (x, y, z) * 3 = 9
-uniform float attractorStrengths[3];  // それぞれの強度
+uniform float attractorPositions[12];  // 3つのアトラクタを格納 (x, y, z) * 3 = 9
+uniform float attractorStrengths[4];  // それぞれの強度
 uniform int numAttractors;
+uniform int patternType;
 
 // ==== 定数定義 =====
 const int POTENTIAL_DEFAULT = 0;
@@ -17,9 +18,10 @@ const int POTENTIAL_DISTANCE = 3;
 
 // ==== 構造体定義 =====
 struct Pattern {
-    int attractors;
-    int type;
-    float beatTime;
+  int attractors;
+  int type;
+  float beatTime;
+  float centerRadius;
 };
 
 struct PotentialResult {
@@ -33,16 +35,18 @@ struct ContourResult {
 
 // ==== パターン定義 =====
 Pattern getPattern(int id) {
-    float currentBeatTime = time / 60.0;
-    switch (id) {
-        case 0:
-            return Pattern(1, POTENTIAL_DEFAULT, 150.0*currentBeatTime);
-        case 1:
-            return Pattern(3, POTENTIAL_WARP, 120.0*currentBeatTime);
-        case 2:
-            return Pattern(1, POTENTIAL_FORCE, 120.0*currentBeatTime);
-        default:
-            return Pattern(1, POTENTIAL_DISTANCE, 120.0*currentBeatTime);
+  float currentBeatTime = time / 60.0;
+  switch (id) {
+  case 0:
+    return Pattern(1, POTENTIAL_DEFAULT, -150.0*currentBeatTime,0.007);
+  case 1:
+    return Pattern(3, POTENTIAL_WARP, 120.0*currentBeatTime,0.007);
+  case 2:
+    return Pattern(2, POTENTIAL_FORCE, -120.0*currentBeatTime,0.01);
+  case 3:
+    return Pattern(4, POTENTIAL_DEFAULT, 360.0*currentBeatTime,0.01);
+  default:
+          return Pattern(1, POTENTIAL_DISTANCE, 60.0*currentBeatTime,0.007);
     }
 }
 
@@ -182,7 +186,7 @@ float calculateDefaultPotential(vec2 uv, vec3 attractorPos, float strength, floa
     const float baseFreq = 7.0; // 基本周波数
     
     // Perlinノイズで位相を生成（一度だけ計算）
-    float phaseNoise = perlinNoise(vec3(uv * 5.0, beatTime*0.5));
+    float phaseNoise = perlinNoise(vec3(uv * 5.0, beatTime*0.125));
     
     // 基本の歪み
     float warp;
@@ -285,13 +289,15 @@ PotentialResult calculatePotential(vec2 uv, Pattern pattern) {
 ContourResult generateContour(PotentialResult potential, Pattern pattern) {
     float lineWidth;
     float contourPattern;
+    float minDist=potential.minDist;
+    float beatTime=pattern.beatTime;
     
     switch (pattern.type) {
         case POTENTIAL_DEFAULT:
             // デフォルトポテンシャル用の等高線
-            float defaultFrequency = 0.001 + 0.02 * (1.0 - exp(-115.0 * potential.minDist));
+            float defaultFrequency = 0.001 + 0.02 * (1.0 - exp(-115.0 * minDist));
             lineWidth = mix(0.5, 0.6, smoothstep(0.0, 1.0, potential.minDist));
-            contourPattern = fract(potential.value * defaultFrequency * 1.7 + fract(pattern.beatTime));
+            contourPattern = fract(potential.value * defaultFrequency * 1.7 + fract(beatTime));
             float defaultContourLine = smoothstep(0.0, lineWidth, contourPattern) * 
                                      smoothstep(lineWidth * 1.1, lineWidth, contourPattern);
             defaultContourLine = pow(defaultContourLine, 10.1);
@@ -303,21 +309,32 @@ ContourResult generateContour(PotentialResult potential, Pattern pattern) {
             float farFunction = 0.05 / (1.0 + 0.1 / max(potential.minDist, 0.001));
             float warpFrequency = nearFunction * farFunction;
             lineWidth = 0.9;  // 元の実装では固定値を使用
-            contourPattern = fract(potential.value * warpFrequency * 5.7 + fract(pattern.beatTime * 2.0/3.0));
+            contourPattern = fract(potential.value * warpFrequency * 5.7 + fract(beatTime));
             float warpContourLine = smoothstep(0.0, lineWidth, contourPattern) * 
                                   smoothstep(lineWidth * 2.0, lineWidth, contourPattern);
             warpContourLine = pow(warpContourLine, 0.5);
             return ContourResult(warpContourLine);
             
         case POTENTIAL_FORCE:
-            // 力場ベースのポテンシャル用の等高線
-            float forceFrequency = 4.5 + 0.5 * (1.0 - exp(-7.0 * potential.minDist));
-            lineWidth = mix(0.5, 1.2, smoothstep(0.0, 0.3, potential.minDist));
-            contourPattern = fract(potential.value * forceFrequency * 5.7 + fract(pattern.beatTime * 2.0/3.0));
-            float forceContourLine = smoothstep(0.0, lineWidth, contourPattern) * 
-                                   smoothstep(lineWidth * 2.0, lineWidth, contourPattern);
-            forceContourLine = pow(forceContourLine, 0.5);
-            return ContourResult(forceContourLine);
+          // 周波数：minDistが大きくなると適度に増える
+          float forceFrequency = minDist * 0.3 / (0.5 - minDist);
+
+          // 線幅：近距離では太く、遠距離で細く（視認性重視）
+          float lineWidth = 10.0*minDist;
+
+          // パターン生成
+          float contourPattern = fract(potential.value * forceFrequency*0.8 - fract(beatTime));
+
+          // 等高線の二重 smoothstep による幅制御
+          float forceContourLine = smoothstep(2.0, lineWidth*0.1, contourPattern) *
+            smoothstep(lineWidth * 0.002, lineWidth*4.0, contourPattern);
+
+          // カーブ補正（出力強調）
+          forceContourLine = pow(forceContourLine, 0.5);
+
+          // 出力
+          return ContourResult(forceContourLine);
+
             
         default:  // POTENTIAL_DISTANCE
             // 距離ベースのポテンシャル用の等高線
@@ -326,7 +343,7 @@ ContourResult generateContour(PotentialResult potential, Pattern pattern) {
             contourPattern = fract(potential.value * distanceFrequency * 5.7 + fract(pattern.beatTime * 2.0/3.0));
             float distanceContourLine = smoothstep(0.0, lineWidth, contourPattern) * 
                                       smoothstep(lineWidth * 2.0, lineWidth, contourPattern);
-            distanceContourLine = pow(distanceContourLine, 0.5);
+            distanceContourLine = pow(distanceContourLine, 0.9);
             return ContourResult(distanceContourLine);
     }
 }
@@ -346,7 +363,8 @@ void main() {
     vec2 uv = gl_FragCoord.xy / resolution.xy;
    
     // ==== 初期設定 =====
-    Pattern pattern = getPattern(2);
+    Pattern pattern = getPattern(patternType);
+
     
     // ==== 描画計算本体 ====
     // ポテンシャルの値の計算
@@ -363,7 +381,7 @@ void main() {
     
     // 背景色と線の色を合成、もしくはアトラクタの中心を塗りつぶし
     vec3 finalColor = mix(backgroundColor, lineColor, contour.line);
-    if (potential.minDist < 0.007) {
+    if (potential.minDist < pattern.centerRadius) {
         finalColor = backgroundColor;
     }
     gl_FragColor = vec4(finalColor, 1.0);
