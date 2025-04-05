@@ -1,295 +1,363 @@
+// main.ts - OpenGL/WebGL/GLSL バージョン情報を取得するプログラム
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { GUI } from 'dat.gui';
+import './style.css';
 
-// シェーダーのインポート
-import vertexShader from '/src/shaders/vertex.glsl';
-import fragmentShader from '/src/shaders/fragment.glsl';
-import chromaticAberrationFragmentShader from '/src/shaders/chromaticAberration.glsl';
-import chromaticAberrationVertexShader from '/src/shaders/chromaticAberrationVertex.glsl';
-
-class FluidArtSimulation {
-  private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
-  private renderer: THREE.WebGLRenderer;
-  private geometry: THREE.PlaneGeometry;
-  private material: THREE.ShaderMaterial;
-  private mesh: THREE.Mesh;
-  private clock: THREE.Clock;
-  private controls: OrbitControls;
-  private composer: EffectComposer;
-  private bloomPass: UnrealBloomPass;
-  private chromaticAberrationPass: ShaderPass;
-  private lastMousePosition: { x: number, y: number } = { x: 0, y: 0 };
-  private mousePosition: { x: number, y: number } = { x: 0, y: 0 };
-  private mouseVelocity: { x: number, y: number } = { x: 0, y: 0 };
-  private gui: GUI;
-  private params = {
-    bloomEnabled: true,
-    chromaticAberrationEnabled: true,
-    bloomStrength: 1.5,
-    bloomRadius: 0.4,
-    bloomThreshold: 0.2,
-    chromaticAberrationStrength: 0.5,
-    noiseScale: 1.5,
-    noiseIntensity: 0.5,
-    fluidIntensity: 0.8,
-    colorIntensity: 1.2,
-    colorA: '#3a0ca3', // 深い青/紫
-    colorB: '#f72585', // マゼンタ/ピンク
-    colorC: '#4cc9f0', // 水色/シアン
-    colorD: '#ffd166', // 黄色/金
-  };
-
-  constructor() {
-    // シーンのセットアップ
-    this.scene = new THREE.Scene();
-    
-    // カメラのセットアップ
-    this.camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    this.camera.position.z = 1;
-    
-    // レンダラーのセットアップ
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    document.body.appendChild(this.renderer.domElement);
-    
-    // コントロールのセットアップ
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    
-    // 時間管理用のクロック
-    this.clock = new THREE.Clock();
-    
-    // ジオメトリとマテリアルの作成
-    this.createMeshWithShaders();
-    
-    // ポストプロセッシングの設定
-    this.setupPostProcessing();
-    
-    // GUI設定
-    this.setupGUI();
-    
-    // リサイズイベントのリスナー
-    window.addEventListener('resize', this.handleResize.bind(this));
-    
-    // マウスイベントのリスナー
-    window.addEventListener('mousemove', this.handleMouseMove.bind(this));
-    
-    // アニメーションループの開始
-    this.animate();
+/**
+ * OpenGL/WebGL バージョン情報を取得して表示する
+ */
+function getOpenGLVersionInfo(): void {
+  // コンテナを作成
+  const container = document.createElement('div');
+  container.className = 'info-container';
+  document.body.appendChild(container);
+  
+  // Three.jsのレンダラーを初期化 (DOM要素は追加しない)
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  
+  // WebGLレンダリングコンテキストを取得
+  const gl = renderer.getContext();
+  
+  // OpenGLの基本情報を取得
+  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+  
+  // セクションヘッダーを追加
+  addSectionHeader(container, 'OpenGL/WebGL/GLSL バージョン情報');
+  
+  // バージョン情報
+  const webGLVersion = gl.getParameter(gl.VERSION);
+  const glslVersion = gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
+  
+  addInfoItem(container, 'WebGL バージョン', webGLVersion);
+  addInfoItem(container, 'GLSL バージョン', glslVersion);
+  
+  // WebGLバージョンに基づいてOpenGLバージョンを推定
+  let estimatedGLVersion = 'Unknown';
+  
+  if (webGLVersion.includes('WebGL 2.0')) {
+    estimatedGLVersion = 'OpenGL ES 3.0 or higher';
+  } else if (webGLVersion.includes('WebGL 1.0')) {
+    estimatedGLVersion = 'OpenGL ES 2.0 or higher';
   }
-
-  private createMeshWithShaders(): void {
-    this.geometry = new THREE.PlaneGeometry(2, 2, 128, 128);
-    
-    // シェーダーマテリアルの作成
-    this.material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-        uMouse: { value: new THREE.Vector2(0, 0) },
-        uMouseVelocity: { value: new THREE.Vector2(0, 0) },
-        uColorA: { value: new THREE.Color(this.params.colorA) },
-        uColorB: { value: new THREE.Color(this.params.colorB) },
-        uColorC: { value: new THREE.Color(this.params.colorC) },
-        uColorD: { value: new THREE.Color(this.params.colorD) },
-        uNoiseScale: { value: this.params.noiseScale },
-        uNoiseIntensity: { value: this.params.noiseIntensity },
-        uFluidIntensity: { value: this.params.fluidIntensity },
-        uColorIntensity: { value: this.params.colorIntensity },
-      }
-    });
-    
-    // メッシュの作成とシーンへの追加
-    this.mesh = new THREE.Mesh(this.geometry, this.material);
-    this.scene.add(this.mesh);
+  
+  addInfoItem(container, '推定 OpenGL バージョン', estimatedGLVersion);
+  
+  // ドライバー情報
+  if (debugInfo) {
+    addInfoItem(container, '実際のGPUベンダー', gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL));
+    addInfoItem(container, '実際のGPUレンダラー', gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL));
+  } else {
+    addInfoItem(container, 'GPU ベンダー', gl.getParameter(gl.VENDOR));
+    addInfoItem(container, 'GPU レンダラー', gl.getParameter(gl.RENDERER));
   }
-
-  private setupPostProcessing(): void {
-    // レンダーターゲットの作成
-    const renderTarget = new THREE.WebGLRenderTarget(
-      window.innerWidth, 
-      window.innerHeight, 
-      {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-        format: THREE.RGBAFormat,
-        encoding: THREE.sRGBEncoding
-      }
-    );
-    
-    // エフェクトコンポーザーの作成
-    this.composer = new EffectComposer(this.renderer, renderTarget);
-    
-    // レンダーパスの追加
-    const renderPass = new RenderPass(this.scene, this.camera);
-    this.composer.addPass(renderPass);
-    
-    // ブルームエフェクトの追加
-    this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      this.params.bloomStrength,
-      this.params.bloomRadius,
-      this.params.bloomThreshold
-    );
-    this.composer.addPass(this.bloomPass);
-    
-    // 色収差エフェクトの追加
-    this.chromaticAberrationPass = new ShaderPass({
-      uniforms: {
-        tDiffuse: { value: null },
-        uStrength: { value: this.params.chromaticAberrationStrength },
-        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
-      },
-      vertexShader: chromaticAberrationVertexShader,
-      fragmentShader: chromaticAberrationFragmentShader
-    });
-    this.composer.addPass(this.chromaticAberrationPass);
+  
+  // WebGL2の場合は追加の制限情報を表示
+  if (gl instanceof WebGL2RenderingContext) {
+    addSectionHeader(container, 'WebGL2/OpenGL ES 3.0 の追加情報');
+    const gl2 = gl as WebGL2RenderingContext;
+    addInfoItem(container, '最大Uniform Blocks', gl2.getParameter(gl2.MAX_UNIFORM_BLOCKS).toString());
+    addInfoItem(container, '最大サンプル数', gl2.getParameter(gl2.MAX_SAMPLES).toString());
+    addInfoItem(container, '最大Draw Buffers', gl2.getParameter(gl2.MAX_DRAW_BUFFERS).toString());
+    addInfoItem(container, '最大Color Attachments', gl2.getParameter(gl2.MAX_COLOR_ATTACHMENTS).toString());
+    addInfoItem(container, '最大3Dテクスチャサイズ', gl2.getParameter(gl2.MAX_3D_TEXTURE_SIZE).toString());
   }
+  
+  // 共通の制限情報
+  addSectionHeader(container, 'ハードウェア制限');
+  addInfoItem(container, '最大テクスチャサイズ', `${gl.getParameter(gl.MAX_TEXTURE_SIZE)}px`);
+  
+  const maxViewportDims = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+  addInfoItem(container, '最大ビューポートサイズ', `${maxViewportDims[0]}x${maxViewportDims[1]}px`);
+  
+  addInfoItem(container, '最大フラグメントシェーダー変数', gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS).toString());
+  addInfoItem(container, '最大頂点シェーダー変数', gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS).toString());
+  addInfoItem(container, '最大テクスチャユニット数', gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS).toString());
 
-  private setupGUI(): void {
-    this.gui = new GUI();
-    
-    // エフェクト設定フォルダ
-    const effectsFolder = this.gui.addFolder('ポストエフェクト');
-    
-    // ブルームエフェクト設定
-    effectsFolder.add(this.params, 'bloomEnabled').name('ブルーム効果').onChange(() => {
-      this.bloomPass.enabled = this.params.bloomEnabled;
+  // 利用可能なGLSL拡張機能を確認
+  const extensions = gl.getSupportedExtensions();
+  const glslExtensions = extensions ? extensions.filter(ext => 
+    ext.includes('shader') || ext.includes('SHADER') || ext.includes('texture') || ext.includes('TEXTURE')
+  ) : [];
+  
+  if (glslExtensions.length > 0) {
+    addSectionHeader(container, 'GLSL関連の拡張機能');
+    const extList = document.createElement('ul');
+    extList.className = 'extensions-list';
+    glslExtensions.forEach(ext => {
+      const item = document.createElement('li');
+      item.textContent = ext;
+      extList.appendChild(item);
     });
-    
-    effectsFolder.add(this.params, 'bloomStrength', 0, 3, 0.01).name('ブルーム強度').onChange((value) => {
-      this.bloomPass.strength = value;
-    });
-    
-    effectsFolder.add(this.params, 'bloomRadius', 0, 1, 0.01).name('ブルーム半径').onChange((value) => {
-      this.bloomPass.radius = value;
-    });
-    
-    effectsFolder.add(this.params, 'bloomThreshold', 0, 1, 0.01).name('ブルーム閾値').onChange((value) => {
-      this.bloomPass.threshold = value;
-    });
-    
-    // 色収差エフェクト設定
-    effectsFolder.add(this.params, 'chromaticAberrationEnabled').name('色収差効果').onChange(() => {
-      this.chromaticAberrationPass.enabled = this.params.chromaticAberrationEnabled;
-    });
-    
-    effectsFolder.add(this.params, 'chromaticAberrationStrength', 0, 2, 0.01).name('色収差強度').onChange((value) => {
-      this.chromaticAberrationPass.uniforms.uStrength.value = value;
-    });
-    
-    effectsFolder.open();
-    
-    // シェーダーパラメータフォルダ
-    const shaderFolder = this.gui.addFolder('シェーダーパラメータ');
-    
-    shaderFolder.add(this.params, 'noiseScale', 0.1, 5, 0.1).name('ノイズスケール').onChange((value) => {
-      this.material.uniforms.uNoiseScale.value = value;
-    });
-    
-    shaderFolder.add(this.params, 'noiseIntensity', 0, 2, 0.1).name('ノイズ強度').onChange((value) => {
-      this.material.uniforms.uNoiseIntensity.value = value;
-    });
-    
-    shaderFolder.add(this.params, 'fluidIntensity', 0, 2, 0.1).name('流体強度').onChange((value) => {
-      this.material.uniforms.uFluidIntensity.value = value;
-    });
-    
-    shaderFolder.add(this.params, 'colorIntensity', 0, 3, 0.1).name('色彩強度').onChange((value) => {
-      this.material.uniforms.uColorIntensity.value = value;
-    });
-    
-    shaderFolder.open();
-    
-    // カラーパレットフォルダ
-    const colorFolder = this.gui.addFolder('カラーパレット');
-    
-    colorFolder.addColor(this.params, 'colorA').name('色 A').onChange((value) => {
-      this.material.uniforms.uColorA.value.set(value);
-    });
-    
-    colorFolder.addColor(this.params, 'colorB').name('色 B').onChange((value) => {
-      this.material.uniforms.uColorB.value.set(value);
-    });
-    
-    colorFolder.addColor(this.params, 'colorC').name('色 C').onChange((value) => {
-      this.material.uniforms.uColorC.value.set(value);
-    });
-    
-    colorFolder.addColor(this.params, 'colorD').name('色 D').onChange((value) => {
-      this.material.uniforms.uColorD.value.set(value);
-    });
-    
-    colorFolder.open();
+    container.appendChild(extList);
   }
-
-  private handleResize(): void {
-    // ウィンドウサイズ変更時の処理
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
-    this.composer.setSize(width, height);
-    
-    if (this.material.uniforms.uResolution) {
-      this.material.uniforms.uResolution.value.set(width, height);
-    }
-    
-    if (this.chromaticAberrationPass.uniforms.uResolution) {
-      this.chromaticAberrationPass.uniforms.uResolution.value.set(width, height);
-    }
-  }
-
-  private handleMouseMove(event: MouseEvent): void {
-    // 前回のマウス位置を保存
-    this.lastMousePosition.x = this.mousePosition.x;
-    this.lastMousePosition.y = this.mousePosition.y;
-    
-    // 現在のマウス位置を更新（-1 ~ 1の範囲に正規化）
-    this.mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
-    this.mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-    // マウスの速度を計算
-    this.mouseVelocity.x = this.mousePosition.x - this.lastMousePosition.x;
-    this.mouseVelocity.y = this.mousePosition.y - this.lastMousePosition.y;
-    
-    // uniforms に値を設定
-    this.material.uniforms.uMouse.value.set(this.mousePosition.x, this.mousePosition.y);
-    this.material.uniforms.uMouseVelocity.value.set(this.mouseVelocity.x, this.mouseVelocity.y);
-  }
-
-  private animate(): void {
-    requestAnimationFrame(this.animate.bind(this));
-    
-    // 時間の更新
-    const elapsedTime = this.clock.getElapsedTime();
-    this.material.uniforms.uTime.value = elapsedTime;
-    
-    // コントロールの更新
-    this.controls.update();
-    
-    // エフェクトコンポーザーでレンダリング
-    this.composer.render();
-  }
+  
+  // 後片付け
+  renderer.dispose();
 }
 
-// アプリケーションの開始
-window.addEventListener('DOMContentLoaded', () => {
-  new FluidArtSimulation();
+/**
+ * セクションヘッダーを追加
+ */
+function addSectionHeader(container: HTMLElement, title: string): void {
+  const header = document.createElement('h2');
+  header.textContent = title;
+  container.appendChild(header);
+}
+
+/**
+ * 情報項目を追加
+ */
+function addInfoItem(container: HTMLElement, label: string, value: string): void {
+  const item = document.createElement('div');
+  item.className = 'info-item';
+  
+  const labelElement = document.createElement('strong');
+  labelElement.textContent = label + ': ';
+  
+  item.appendChild(labelElement);
+  item.appendChild(document.createTextNode(value));
+  
+  container.appendChild(item);
+}
+
+/**
+ * 様々なGLSLバージョンをテストして、サポート範囲を特定する
+ */
+function testDetailedShaderVersions(): void {
+  // コンテナを作成
+  const container = document.createElement('div');
+  container.className = 'test-container';
+  document.body.appendChild(container);
+  
+  addSectionHeader(container, 'GLSLバージョンサポートテスト');
+  
+  // レンダラーを作成
+  const renderer = new THREE.WebGLRenderer();
+  const gl = renderer.getContext();
+  
+  // WebGL1/2の確認
+  const isWebGL2 = gl instanceof WebGL2RenderingContext;
+  addInfoItem(container, 'WebGL バージョン', isWebGL2 ? 'WebGL 2.0' : 'WebGL 1.0');
+  
+  // WebGL1/ES 1.00シェーダーはサポートされている前提
+  const basicVersionInfo = document.createElement('div');
+  basicVersionInfo.className = 'info-item supported';
+  basicVersionInfo.textContent = '[SUPPORTED] GLSL ES 1.00 (WebGL 1.0 基本)';
+  container.appendChild(basicVersionInfo);
+  
+  // テスト用のバージョン配列 (OpenGL/GLSL標準とES規格)
+  // 形式: [バージョン文字列, ES規格か, 人間可読名称]
+  const testVersions = [
+    // WebGL 1.0 / OpenGL ES 2.0 関連
+    { version: '100', esVersion: true, name: 'GLSL ES 1.00 (WebGL 1.0)' },
+    
+    // WebGL 2.0 / OpenGL ES 3.0+ 関連
+    { version: '300 es', esVersion: true, name: 'GLSL ES 3.00 (WebGL 2.0)' },
+    { version: '310 es', esVersion: true, name: 'GLSL ES 3.10 (OpenGL ES 3.1)' },
+    { version: '320 es', esVersion: true, name: 'GLSL ES 3.20 (OpenGL ES 3.2)' },
+    
+    // デスクトップOpenGL関連
+    { version: '120', esVersion: false, name: 'GLSL 1.20 (OpenGL 2.1)' },
+    { version: '130', esVersion: false, name: 'GLSL 1.30 (OpenGL 3.0)' },
+    { version: '140', esVersion: false, name: 'GLSL 1.40 (OpenGL 3.1)' },
+    { version: '150', esVersion: false, name: 'GLSL 1.50 (OpenGL 3.2)' },
+    { version: '330', esVersion: false, name: 'GLSL 3.30 (OpenGL 3.3)' },
+    { version: '400', esVersion: false, name: 'GLSL 4.00 (OpenGL 4.0)' },
+    { version: '410', esVersion: false, name: 'GLSL 4.10 (OpenGL 4.1)' },
+    { version: '420', esVersion: false, name: 'GLSL 4.20 (OpenGL 4.2)' },
+    { version: '430', esVersion: false, name: 'GLSL 4.30 (OpenGL 4.3)' },
+    { version: '440', esVersion: false, name: 'GLSL 4.40 (OpenGL 4.4)' },
+    { version: '450', esVersion: false, name: 'GLSL 4.50 (OpenGL 4.5)' },
+    { version: '460', esVersion: false, name: 'GLSL 4.60 (OpenGL 4.6)' }
+  ];
+  
+  // 結果を保存する配列
+  const results: { version: string, name: string, supported: boolean }[] = [];
+  
+  // 各バージョンのシェーダーをテスト
+  testVersions.forEach(test => {
+    const versionDirective = `#version ${test.version}`;
+    
+    // バージョンに応じた適切な構文を使用
+    const isES3Plus = test.esVersion && test.version !== '100';
+    const isDesktopGL3Plus = !test.esVersion && parseInt(test.version) >= 150;
+    
+    // 頂点シェーダーコード
+    let vertexSource = versionDirective + '\n';
+    
+    // ES 3.00+/GL 3.30以降は in/out構文を使用
+    if (isES3Plus || isDesktopGL3Plus) {
+      vertexSource += `
+        in vec3 position;
+        out vec2 vUv;
+        void main() {
+          vUv = position.xy * 0.5 + 0.5;
+          gl_Position = vec4(position, 1.0);
+        }
+      `;
+    } else {
+      // ES 1.00/GL 1.20-1.40は attribute/varying構文を使用
+      vertexSource += `
+        attribute vec3 position;
+        varying vec2 vUv;
+        void main() {
+          vUv = position.xy * 0.5 + 0.5;
+          gl_Position = vec4(position, 1.0);
+        }
+      `;
+    }
+    
+    // フラグメントシェーダーコード
+    let fragmentSource = versionDirective + '\n';
+    
+    // Desktop GLはprecisionが必須でない場合がある
+    if (test.esVersion) {
+      fragmentSource += 'precision mediump float;\n';
+    }
+    
+    // ES 3.00+/GL 3.30以降は in/out構文を使用
+    if (isES3Plus || isDesktopGL3Plus) {
+      fragmentSource += `
+        in vec2 vUv;
+        out vec4 fragColor;
+        void main() {
+          fragColor = vec4(vUv, 0.5, 1.0);
+        }
+      `;
+    } else {
+      // ES 1.00/GL 1.20-1.40は varying/gl_FragColor構文を使用
+      fragmentSource += `
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = vec4(vUv, 0.5, 1.0);
+        }
+      `;
+    }
+    
+    try {
+      // 頂点シェーダーのコンパイルを試行
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+      if (!vertexShader) throw new Error("頂点シェーダーを作成できませんでした");
+      
+      gl.shaderSource(vertexShader, vertexSource);
+      gl.compileShader(vertexShader);
+      
+      const vertexSuccess = gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS);
+      const vertexLog = gl.getShaderInfoLog(vertexShader);
+      
+      // フラグメントシェーダーのコンパイルを試行
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      if (!fragmentShader) throw new Error("フラグメントシェーダーを作成できませんでした");
+      
+      gl.shaderSource(fragmentShader, fragmentSource);
+      gl.compileShader(fragmentShader);
+      
+      const fragmentSuccess = gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS);
+      const fragmentLog = gl.getShaderInfoLog(fragmentShader);
+      
+      // 結果を記録
+      const supported = vertexSuccess && fragmentSuccess;
+      results.push({
+        version: test.version,
+        name: test.name,
+        supported: supported
+      });
+      
+      // シェーダーを削除
+      gl.deleteShader(vertexShader);
+      gl.deleteShader(fragmentShader);
+      
+    } catch (error) {
+      // エラーが発生した場合は非サポートとして記録
+      results.push({
+        version: test.version,
+        name: test.name,
+        supported: false
+      });
+    }
+  });
+  
+  // サポート状況をわかりやすく表示
+  addSectionHeader(container, 'GLSLバージョンサポート一覧');
+  
+  // ES版とデスクトップ版に分類
+  const esVersions = results.filter(r => r.version.includes('es') || r.version === '100');
+  const desktopVersions = results.filter(r => !r.version.includes('es') && r.version !== '100');
+  
+  // ES/WebGLシェーダーの結果を表示
+  const esHeader = document.createElement('h3');
+  esHeader.textContent = 'OpenGL ES / WebGL シェーダー:';
+  container.appendChild(esHeader);
+  
+  const esList = document.createElement('div');
+  esList.className = 'version-list';
+  esVersions.forEach(result => {
+    const item = document.createElement('div');
+    item.className = result.supported ? 'version-item supported' : 'version-item not-supported';
+    item.textContent = `[${result.supported ? 'SUPPORTED' : 'NOT SUPPORTED'}] ${result.name}`;
+    esList.appendChild(item);
+  });
+  container.appendChild(esList);
+  
+  // デスクトップOpenGLシェーダーの結果を表示
+  const desktopHeader = document.createElement('h3');
+  desktopHeader.textContent = 'デスクトップOpenGLシェーダー:';
+  container.appendChild(desktopHeader);
+  
+  const desktopList = document.createElement('div');
+  desktopList.className = 'version-list';
+  desktopVersions.forEach(result => {
+    const item = document.createElement('div');
+    item.className = result.supported ? 'version-item supported' : 'version-item not-supported';
+    item.textContent = `[${result.supported ? 'SUPPORTED' : 'NOT SUPPORTED'}] ${result.name}`;
+    desktopList.appendChild(item);
+  });
+  container.appendChild(desktopList);
+  
+  // サポート境界を特定
+  const supportedES = esVersions.filter(r => r.supported).map(r => r.version);
+  const lastSupportedES = supportedES.length > 0 ? 
+    esVersions.find(r => r.version === supportedES[supportedES.length - 1])?.name : 
+    'なし';
+  
+  const supportedDesktop = desktopVersions.filter(r => r.supported).map(r => r.version);
+  const lastSupportedDesktop = supportedDesktop.length > 0 ? 
+    desktopVersions.find(r => r.version === supportedDesktop[supportedDesktop.length - 1])?.name : 
+    'なし';
+  
+  // サポート境界を表示
+  addSectionHeader(container, 'GLSLバージョンサポート境界');
+  addInfoItem(container, '最高サポートES/WebGLバージョン', lastSupportedES);
+  addInfoItem(container, '最高サポートデスクトップOpenGLバージョン', lastSupportedDesktop);
+  
+  // お勧めの使用バージョンを表示
+  const recommendedVersion = isWebGL2 ? 
+    (supportedES.includes('300 es') ? 'GLSL ES 3.00 (#version 300 es)' : 'GLSL ES 1.00 (#version 100)') :
+    'GLSL ES 1.00 (#version 100)';
+  
+  const recommendDiv = document.createElement('div');
+  recommendDiv.className = 'recommendation';
+  recommendDiv.innerHTML = `
+    <h3>推奨シェーダーバージョン</h3>
+    <div class="recommended-version">${recommendedVersion}</div>
+    <div class="note">(最も広い互換性と安定したサポートのあるバージョン)</div>
+  `;
+  container.appendChild(recommendDiv);
+  
+  // 後片付け
+  renderer.dispose();
+}
+
+// DOMがロードされた後に実行
+document.addEventListener('DOMContentLoaded', () => {
+  // ページタイトルを設定
+  const title = document.createElement('h1');
+  title.textContent = 'OpenGL/GLSL バージョン診断ツール';
+  title.className = 'page-title';
+  document.body.appendChild(title);
+  
+  // 基本情報を取得して表示
+  getOpenGLVersionInfo();
+  
+  // 詳細なGLSLシェーダーバージョンテストを実行
+  testDetailedShaderVersions();
 });

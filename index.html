@@ -1,44 +1,12 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>流体アート風シミュレーション</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      overflow: hidden;
-      background-color: #000;
-    }
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100vh;
-    }
-    .info {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      color: white;
-      font-family: sans-serif;
-      background-color: rgba(0,0,0,0.5);
-      padding: 10px;
-      border-radius: 5px;
-      font-size: 14px;
-      pointer-events: none;
-      opacity: 0.7;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenGL/GLSL バージョン診断ツール</title>
 </head>
 <body>
-  <div class="info">
-    マウスを動かして流体に影響を与えます<br>
-    右上のGUIで各種パラメータを調整できます
-  </div>
+  <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
