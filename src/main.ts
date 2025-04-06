@@ -132,7 +132,8 @@ class FluidArtSimulation {
     );
     
     // エフェクトコンポーザーの作成
-    this.composer = new EffectComposer(this.renderer, renderTarget);
+    //this.composer = new EffectComposer(this.renderer, renderTarget);
+    this.composer = new EffectComposer(this.renderer);
     
     // レンダーパスの追加
     const renderPass = new RenderPass(this.scene, this.camera);
