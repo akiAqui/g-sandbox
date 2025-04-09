@@ -132,12 +132,16 @@ void main() {
     float kNorm = clamp(k*1000.0, 0.0, 1.0);
     vec3 light = normalize(vec3(1.0, 1.0+0.1*sin(iTime), 1.0));
     vec3 view = normalize(ro - p);      
-    //float diff = clamp(dot(n, light), 0.0, 1.0);
+
+
+    //光の反射方向と視線方向が一致するとき、スペキュラ（鏡面）反射が発生する
+    // → その「ちょうど中間の方向」が halfVec（ハーフベクトル）
+
     vec3 halfVec = normalize(light + view);
 
     float diff = max(dot(n, light), 1.0);  
     float spec = pow(clamp(dot(n, halfVec), 0.0, 1.0), 100.0); // ← 64で鋭い光沢
-    vec3 base = vec3(kNorm+0.3);
+    vec3  base = vec3(kNorm+0.3);
     col = base * diff + vec3(1.0) * spec;
 
 
