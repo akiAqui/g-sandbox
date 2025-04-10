@@ -20,12 +20,37 @@ float sdCappedCylinder(vec3 p, float h, float r) {
 
 float petal(vec3 p) {
   float angleOffset = sin(iTime * 0.5) * 0.3;
+
+  // XY平面上で点 p をPI/6（=30度）回転（+時間変化付き）, 花びらの傾き
   p.xy *= rot(PI / 6.0 + angleOffset);
-  p.x = abs(p.x);
-  float zCurve = sin(p.x * 10.0 + iTime * 0.9) * 0.1;
-  p.z -= zCurve;
+
+
+  // X軸方向で左右対称化（負のX側を正に折り返す）。
+  // 目的：花びら形状を一方向にまとめる（対称性を保つ）。
+  // でも、6回回転させるのだから今回は冗長
+  // p.x = abs(p.x);
+
+  // x位置に応じてZ軸方向に曲げを加える値を計算（=湾曲パターン）。
+  // 目的：花びらの中央がZ軸方向にカーブするような効果。
+  float zCurve = sin(p.x * 10.0 + iTime * 0.9) * 0.2;
+
+  // 前行で求めた湾曲量 zCurve によってZ軸を変形。
+  // 結果：Xに沿ってZ方向に波打つような形状。
+  p.x -= zCurve;
+  p.z -= zCurve*0.2;
+
+  // SDFの境界ボックスサイズ（時間要素ありだが無視）。
+  // 目的：花びらの基本サイズ（XYZ方向）を指定。
   vec3 b = vec3(0.05 + 0.03 * sin(iTime * 1.3), 0.1 + 0.1 * sin(iTime * 0.7), 0.2 + 0.1 * sin(iTime * 2.3));
+  //vec3 b = vec3(0.05,0.1,0.2);
+
+  // 形状構築の要。
+  // SDF手法で「角が丸いボックス型の穴（凹み）」を定義：
+  // abs(p - vec3(0.0))：中心を原点としたボックス的構造
+  // max(..., b) - b：bを超える距離だけを抽出 → b内部ならゼロ
+  // length(...) - 0.01：ボックスの「膨らみ」で表面を決定（0.01で形を鋭く）
   float d = length(max(abs(p - vec3(0.0)), b) - b) - 0.01;
+  
   return d;
 }
 
@@ -112,7 +137,7 @@ float map(vec3 p) {
 
   return d;
 }
-
+// 曲率を計算する関数
 float curvature(vec3 p) {
   float e = 0.001;
   float d = map(p);
@@ -122,6 +147,8 @@ float curvature(vec3 p) {
   return (dx + dy + dz - 3.0 * d);
 }
 
+// 鏡面販社のために垂直ベクトルを取っている
+//
 vec3 getNormal(vec3 p) {
   float e = 0.001;
   vec2 h = vec2(1.0, -1.0) * e;
@@ -133,16 +160,19 @@ vec3 getNormal(vec3 p) {
 
 void main() {
   vec2 uv = (gl_FragCoord.xy * 2.0 - iResolution.xy) / iResolution.y;
+  uv*=2.1;
   vec3 ro = vec3(0.0, 0.0, 0.5);
   vec3 rd = normalize(vec3(uv, -1.5));
-
+  float epsilon=0.00000001; //この値で図形の精度が決まるので、荒くすると鏡面ではなくなる
+  
   float t = 0.0;
   float d;
   vec3 p;
   for (int i = 0; i < 128; i++) {
     p = ro + t * rd;
     d = map(p);
-    if (d < 0.0000001) break;
+    if (d < -epsilon) break;
+    if (d < +epsilon) break;
     t += d;
   }
 
