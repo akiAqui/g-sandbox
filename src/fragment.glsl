@@ -68,6 +68,24 @@ float disc(vec3 p) {
   return length(p.xy) - 0.3;
 }
 
+// i番目の球のpulse
+// 
+float pulse(int i){
+  float totalCycleTime = 3.0;        // 全体1サイクル
+  float eachPulseDuration = 1.7;     // 1球の拍動の長さ
+  float interval = 0.1;              // 拍動開始の間隔（重ねる）
+  float localTime = mod(iTime, totalCycleTime);
+  float pulseStart = float(i) * interval;
+  float pulseEnd = pulseStart + eachPulseDuration;
+
+  float pulse = (localTime >= pulseStart && localTime < pulseEnd)
+    ? pow(1.0 - (localTime - pulseStart) / eachPulseDuration, 6.0)
+    : 0.0;
+  
+  return pulse;
+  
+}
+
 float map(vec3 p) {
   float d = 100.0;
 
@@ -78,50 +96,17 @@ float map(vec3 p) {
     d = min(d, petal(pp));
   }
   
-
-  float totalCycleTime = 3.0;        // 全体1サイクル
-  float eachPulseDuration = 1.7;     // 1球の拍動の長さ
-  float interval = 0.1;              // 拍動開始の間隔（重ねる）
-  float localTime = mod(iTime, totalCycleTime);
-
-
-
   int num_of_sphere = 9;
   for (int i = 0; i < num_of_sphere; i++) {
-    float a = float(i) / float(num_of_sphere) * PI * 2.0 + iTime * 0.1;
-    vec3 ps = p - vec3(0.1 * cos(a), 0.1 * sin(a), 0.3);
-    //float r = 0.02 + 0.01 * sin(4.0*iTime+float(i));
-    //float r = 0.01 + 0.03 * pow(abs(sin(iTime * 2.0)), 12.0);
-    //float r = 0.01 + 0.03 * abs(sin(iTime * 2.0));
-    /*
-    float pulse = exp(-30.0 * pow(fract(iTime * 1.2), 2.0));
-    float r = 0.02 + 0.03 * pulse;
-    */
-    /*
-    float s = sin(iTime * 4,.0);
-    float pulse = pow(abs(s), 8.0) * (0.5 + 0.5 * s);
-    float r = 0.01 + 0.03 * pulse;
-    */
-    /* 位相なし、OK! 
-    float t = fract(iTime * 1.0); // 0→1繰返し
-    float pulse = pow(max(0.0, 1.0 - t), 6.0); // 鋭く立ち上がって急減衰
-    float r = 0.01 + 0.03 * pulse;
-    */
-
-    // 全体として拍動させる！
-    float pulseStart = float(i) * interval;
-    float pulseEnd = pulseStart + eachPulseDuration;
-
-    float pulse = (localTime >= pulseStart && localTime < pulseEnd)
-      ? pow(1.0 - (localTime - pulseStart) / eachPulseDuration, 6.0)
-      : 0.0;
-
+    float a = float(i) / float(num_of_sphere) * PI * 2.0 + iTime * 0.1; // 各sphereの中心からの角度
+    vec3 ps = p - vec3(0.1 * cos(a), 0.1 * sin(a), 0.3);                // 極座標的にx,yで中心位置を計算
+    float pulse=pulse(i);
     float r = 0.01 + 0.03 * pulse;
 
     d = min(d, sphere(ps, r));
   }
 
-  // ↓パイプ部分は不要ならコメントのままでOK（ステップ実装時に再有効化）
+  // パイプ部分は不要ならコメントのままでOK（ステップ実装時に再有効化）
   /*
   for (int i = 0; i < 12; i++) {
     float a = float(i) / 12.0 * PI * 2.0;
@@ -194,7 +179,7 @@ void main() {
     // --- 鏡面反射を追加 ---
     vec3 reflectDir = reflect(-view, n);
     vec3 envColor = mix(vec3(0.2, 0.4, 0.6), vec3(0.8, 0.9, 1.0), reflectDir.y * 0.5 + 0.5);
-    col = mix(lit, envColor, 0.7); // 反射色を40%合成
+    col = mix(lit, envColor, 0.9*); // 反射色を40%合成
   }
 
   gl_FragColor = vec4(0.2 + 0.8 * col, 1.0);
