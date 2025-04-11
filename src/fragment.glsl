@@ -179,7 +179,7 @@ void main() {
     // --- 鏡面反射を追加 ---
     vec3 reflectDir = reflect(-view, n);
     vec3 envColor = mix(vec3(0.2, 0.4, 0.6), vec3(0.8, 0.9, 1.0), reflectDir.y * 0.5 + 0.5);
-    col = mix(lit, envColor, 0.9*); // 反射色を40%合成
+    col = mix(lit, envColor,1.9); // 反射色を40%合成
   }
 
   gl_FragColor = vec4(0.2 + 0.8 * col, 1.0);
