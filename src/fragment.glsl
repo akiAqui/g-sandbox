@@ -37,11 +37,12 @@ float petal(vec3 p) {
   // 前行で求めた湾曲量 zCurve によってZ軸を変形。
   // 結果：Xに沿ってZ方向に波打つような形状。
   p.x -= zCurve;
-  p.z -= zCurve*0.2;
+  //p.z -= zCurve*0.0002;
 
   // SDFの境界ボックスサイズ（時間要素ありだが無視）。
   // 目的：花びらの基本サイズ（XYZ方向）を指定。
-  vec3 b = vec3(0.05 + 0.03 * sin(iTime * 1.3), 0.1 + 0.1 * sin(iTime * 0.7), 0.2 + 0.1 * sin(iTime * 2.3));
+  //vec3 b = vec3(0.05 + 0.03 * sin(iTime * 1.3), 0.1 + 0.1 * sin(iTime * 0.7), 0.2 + 0.1 * sin(iTime * 2.3));
+  vec3 b = vec3(0.05 + 0.03 * sin(iTime * 1.3), 0.1 + 0.1 * sin(iTime * 0.7), 0.01);
   //vec3 b = vec3(0.05,0.1,0.2);
 
   // 形状構築の要。
@@ -145,10 +146,10 @@ vec3 getNormal(vec3 p) {
 
 void main() {
   vec2 uv = (gl_FragCoord.xy * 2.0 - iResolution.xy) / iResolution.y;
-  uv*=2.1;
-  vec3 ro = vec3(0.0, 0.0, 0.5);
-  vec3 rd = normalize(vec3(uv, -1.5));
-  float epsilon=0.00000001; //この値で図形の精度が決まるので、荒くすると鏡面ではなくなる
+  uv*=0.8;                                  // 画面の拡大縮小
+  vec3 ro = vec3(0.0, 0.0, 0.9);            // Ray Origin/カメラ位置
+  vec3 rd = normalize(vec3(uv, -1.5));      // 視線ベクトル、方向
+  float epsilon=0.00000001;                 // 図形の精度。大きくすると荒くなる
   
   float t = 0.0;
   float d;
