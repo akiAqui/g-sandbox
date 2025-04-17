@@ -41,13 +41,13 @@ function renderOnce() {
   renderer.render(scene, camera)
 }
 
-renderOnce()
+renderOnce();
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
   material.uniforms.resolution.value.set(window.innerWidth, window.innerHeight)
-  renderOnce();,
+  renderOnce();
 })
 
