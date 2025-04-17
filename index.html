@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spiral Interaction</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/src/main.ts"></script>
+    <pre id="info" style="font-family: monospace; white-space: pre-wrap;"></pre>
+<script>
+(async function() {
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+
+  let info = '';
+
+  if (!gl) {
+    info = 'WebGL not supported in this environment.';
+  } else {
+    const dbgRenderInfo = gl.getExtension('WEBGL_debug_renderer_info');
+
+    info += `WebGL Version:       ${gl.getParameter(gl.VERSION)}\n`;
+    info += `GLSL Version:        ${gl.getParameter(gl.SHADING_LANGUAGE_VERSION)}\n`;
+    info += `Vendor:              ${gl.getParameter(gl.VENDOR)}\n`;
+    info += `Renderer:            ${gl.getParameter(gl.RENDERER)}\n`;
+
+    if (dbgRenderInfo) {
+      info += `Unmasked Vendor:     ${gl.getParameter(dbgRenderInfo.UNMASKED_VENDOR_WEBGL)}\n`;
+      info += `Unmasked Renderer:   ${gl.getParameter(dbgRenderInfo.UNMASKED_RENDERER_WEBGL)}\n`;
+    }
+
+    info += `\n--- Capabilities ---\n`;
+    info += `MAX_RENDERBUFFER_SIZE: ${gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)}\n`;
+    info += `MAX_TEXTURE_SIZE:      ${gl.getParameter(gl.MAX_TEXTURE_SIZE)}\n`;
+    info += `MAX_VIEWPORT_DIMS:     ${gl.getParameter(gl.MAX_VIEWPORT_DIMS)}\n`;
+
+    info += `\n--- Display Info ---\n`;
+    info += `window.devicePixelRatio: ${window.devicePixelRatio}\n`;
+    info += `Screen Resolution:       ${window.screen.width} x ${window.screen.height}\n`;
+    info += `Available Screen Size:   ${window.screen.availWidth} x ${window.screen.availHeight}\n`;
+  }
+
+  document.getElementById('info').textContent = info;
+})();
+</script>
+
+
+  </body>
+</html>
+
