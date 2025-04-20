@@ -110,6 +110,98 @@ controls.addEventListener('end', () => {
   renderer.render(scene, camera);
 });
 
+document.getElementById('save-button')?.addEventListener('click', saveRenderImage);
+
+
+
+function showFeedback(success: boolean) {
+  const status = document.getElementById('save-status');
+  if (!status) return;
+
+  status.textContent = success ? 'saved' : 'failed';
+  status.classList.remove('visible');
+  void status.offsetWidth; // Reflow を強制して再アニメーションを可能に
+  status.classList.add('visible');
+}
+
+function flipImageDataVertically(imageData: ImageData): ImageData {
+  const { width, height, data } = imageData;
+  const flipped = new Uint8ClampedArray(data.length);
+  const rowSize = width * 4;
+  for (let y = 0; y < height; y++) {
+    const srcRow = y * rowSize;
+    const dstRow = (height - y - 1) * rowSize;
+    flipped.set(data.slice(srcRow, srcRow + rowSize), dstRow);
+  }
+  return new ImageData(flipped, width, height);
+}
+
+
+
+
+function saveRenderImage() {
+  try {
+    const widthInput = document.getElementById('width-input') as HTMLInputElement;
+    const heightInput = document.getElementById('height-input') as HTMLInputElement;
+    const filenameInput = document.getElementById('filename-input') as HTMLInputElement;
+
+    const width = parseInt(widthInput.value);
+    const height = parseInt(heightInput.value);
+    const filename = filenameInput.value || 'render';
+
+    // 現在の uResolution の値を保存しておく
+    const originalResolution = material.uniforms.uResolution.value.clone();
+
+    // 保存用レンダーターゲットを作成
+    const renderTarget = new THREE.WebGLRenderTarget(width, height);
+    renderTarget.texture.encoding = renderer.outputEncoding;
+
+    // 一時的に uResolution を保存サイズに
+    material.uniforms.uResolution.value.set(width, height);
+
+    // レンダリング先を renderTarget に切り替え
+    renderer.setRenderTarget(renderTarget);
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+
+    // renderTarget の内容を canvas に描き出す
+    const buffer = new Uint8Array(width * height * 4);
+    renderer.readRenderTargetPixels(renderTarget, 0, 0, width, height, buffer);
+
+    // ピクセルデータをImageDataとしてcanvasに出力
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get 2D context');
+
+    const imageData = ctx.createImageData(width, height);
+    imageData.data.set(buffer);
+    ctx.putImageData(flipImageDataVertically(imageData), 0, 0); // WebGLは上下反転なので修正
+
+    // PNGとして保存
+    const link = document.createElement('a');
+    link.download = `${filename}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+
+    // 復元処理
+    renderer.setRenderTarget(null);
+    material.uniforms.uResolution.value.copy(originalResolution);
+    renderer.setSize(originalResolution.x, originalResolution.y, false);
+    camera.aspect = originalResolution.x / originalResolution.y;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+
+    showFeedback(true);
+  } catch (e) {
+    showFeedback(false);
+  }
+}
+
+
 
 
 
@@ -287,11 +379,7 @@ if (typeof window.setParamPanelVisible === 'function') {
   window.setParamPanelVisible(true)
 }
 
-
-
 topAllowanceToGlslControls()
-
-
 
 addColorPickerH('fog-color', 'Fog Color', '#222222', (color) => {
   material.uniforms.uFogColor.value.copy(color)
@@ -299,11 +387,9 @@ addColorPickerH('fog-color', 'Fog Color', '#222222', (color) => {
 
 
 addColorPickerH('color-picker1', 'Color #1', '#448844', (color) => {
-  console.log('color1 changed', color)
   material.uniforms.uColor1.value.copy(color)
 })
 addSlider('freq-slider', 'Frequency', 0, 10, 0.1, 1.0, (v) => {
-  console.log('slider changed', v)  
   material.uniforms.uFreq.value = v
 })
 

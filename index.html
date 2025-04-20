@@ -221,21 +221,8 @@
           settingsBar.style.display = 'none';
       };
       
-      document.getElementById('save-button').onclick = () => {
-          try {
-              const canvas = document.querySelector('canvas');
-              const link = document.createElement('a');
-              const filename = document.getElementById('filename-input').value || 'render';
-              link.download = `${filename}.png`;
-              link.href = canvas.toDataURL('image/png');
-              link.click();
-              showFeedback(true);
-          } catch (e) {
-              showFeedback(false);
-          }
-      };
       function hideAllUI() {
-          console.log("hideAllUI");
+        console.log("hideAllUI");
         document.getElementById('param-toggle').style.display = 'none';
         document.getElementById('glsl-controls').style.display = 'none';
         document.getElementById('ui-bar').style.display = 'none';
@@ -243,6 +230,7 @@
         document.getElementById('settings-bar').style.display = 'none';
         document.getElementById('info').style.display = 'none';
       };
+
       function showAllUI() {
         document.getElementById('param-toggle').style.display = 'block';
         document.getElementById('glsl-controls').style.display = 'flex';
@@ -252,17 +240,6 @@
         document.getElementById('info').style.display = 'none';
       };
 
-
-
-      function showFeedback(success = true) {
-          feedback.textContent = success ? 'Saved' : 'Failed';
-          feedback.className = success ? '' : 'error';
-          feedback.style.display = 'block';
-          setTimeout(() => {
-              feedback.style.display = 'none';
-          }, 2000);
-      }
-      
       let uiHidden = false;
 
       function toggleUIVisibility() {
