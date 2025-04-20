@@ -1,12 +1,27 @@
 precision highp float;
 
-uniform vec2 resolution;
-uniform float time;
+uniform vec2  uResolution;
+uniform float uTime;
+uniform vec3  uCameraPos;
+uniform vec3  uTarget;
+uniform bool  uLowQuality;
+
 out vec4 outColor;
 
-#define MAX_STEPS 256
-#define MAX_DIST 10.0
-#define SURF_DIST 0.001
+/*
+  視点移動時の他の最適化要素
+  - sceneSDFで描画対象を減らす
+  - normalの計算と影の計算はしない
+  - 形状を簡略形状に置き換える（かなり面倒くさいが）
+  - もし、テクスチャを張るなら省略する
+ */
+
+#define HIGH_QUALITY_STEPS 256
+#define LOW_QUALITY_STEPS 20
+#define HIGH_QUALITY_MAXDIST 10.0
+#define LOW_QUALITY_MAXDIST   8.0
+#define HIGH_QUALITY_SURFDIST 0.001
+#define LOW_QUALITY_SURFDIST  0.1
 #define MIN_STEP 0.001
 #define MAX_STEP 0.2
 
@@ -134,6 +149,22 @@ float crescent(vec3 p, vec3 center1, float r1, vec3 center2, float r2) {
     return max(dZ, d2D); // Zも一致して初めて接触
 }
 
+// 
+// 視線方向ベクトルをカメラ位置と注視点から構築する
+//
+vec3 calcRayDir(vec2 uv, vec3 ro, vec3 target) {
+    vec3 forward = normalize(target - ro);
+    vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
+    vec3 up = cross(forward, right);
+    return normalize(forward + uv.x * right + uv.y * up);
+}
+
+
+
+
+//
+// ノイズ関連
+//
 float sdBox(vec2 p, vec2 b) {
     vec2 d = abs(p) - b;
     return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
@@ -241,12 +272,17 @@ vec3 estimateNormal(vec3 p) {
 
 float rayMarch(vec3 ro, vec3 rd) {
     float dO = 0.0;
-    for (int i = 0; i < MAX_STEPS; i++) {
-        vec3 p = ro + rd * dO;
+    int   maxSteps = uLowQuality ? LOW_QUALITY_STEPS    : HIGH_QUALITY_STEPS;
+    float eps      = uLowQuality ? LOW_QUALITY_SURFDIST : HIGH_QUALITY_SURFDIST;
+    float maxDist  = uLowQuality ? LOW_QUALITY_MAXDIST  : HIGH_QUALITY_MAXDIST;
+    
+    for (int i = 0; i < maxSteps; i++) {
+        vec3   p = ro + rd * dO;
         float dS = sceneSDF(p);
-        if (dS < SURF_DIST) return dO;
-        if (dO > MAX_DIST) break;
-        dO += clamp(dS * 0.2, MIN_STEP, MAX_STEP);
+        
+        if (dS < eps) return dO;
+       if (dO > maxDist) break;
+        dO += uLowQuality ? dS : clamp(dS * 0.2, MIN_STEP, MAX_STEP);
     }
     return -1.0;
 }
@@ -265,43 +301,10 @@ float softShadow(vec3 ro, vec3 rd) {
 }
 
 void main() {
-    vec2 uv = (gl_FragCoord.xy / resolution.xy - 0.5) * 1.0;
-    uv.x *= resolution.x / resolution.y;
-    vec3 ro = vec3(0.0, 0.1, 3.0);
-    vec3 target = vec3(0.0);
-    vec3 forward = normalize(target - ro);
-    vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
-    vec3 up = cross(forward, right);
-    vec3 rd = normalize(forward + uv.x * right + uv.y * up);
+    vec2 uv = (gl_FragCoord.xy * 2.0 - uResolution.xy) / uResolution.y;
 
-    float dist = rayMarch(ro, rd);
-    if (dist < 0.0) {
-      outColor = vec4(0.0);
-        return;
-    }
-
-    vec3 p = ro + rd * dist;
-
-
-    
-    vec3 normal = estimateNormal(p);
-    vec3 lightDir = normalize(vec3(-0.8, 0.6, 1.0));
-    float diff = clamp(dot(normal, lightDir), 0.0, 1.0);
-    float shadow = softShadow(p + normal * 0.01, lightDir);
-
-    vec3 color = vec3(1.0) * diff * shadow;
-    outColor = vec4(color, 1.0);
-}
-/*
-void main() {
-    vec2 uv = (gl_FragCoord.xy / resolution.xy - 0.5) * 3.2;
-    uv.x *= resolution.x / resolution.y;
-    vec3 ro = vec3(-3.0, 3.0, 2.2);
-    vec3 target = vec3(0.0);
-    vec3 forward = normalize(target - ro);
-    vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
-    vec3 up = cross(forward, right);
-    vec3 rd = normalize(forward + uv.x * right + uv.y * up);
+    vec3 ro = uCameraPos;
+    vec3 rd = calcRayDir(uv, ro, uTarget);
 
     float dist = rayMarch(ro, rd);
     if (dist < 0.0) {
@@ -309,33 +312,13 @@ void main() {
         return;
     }
 
-    vec3 p = ro + rd * dist;
+    vec3 p = ro + dist * rd;
     vec3 normal = estimateNormal(p);
     vec3 lightDir = normalize(vec3(-0.8, 0.6, 1.0));
-    vec3 viewDir = normalize(ro - p);
 
-    // --- トゥーン風陰影（階調）
-    float diff = clamp(dot(normal, lightDir), 0.0, 1.0);
-    float levels = 10.0;
-    float toonShade = floor(diff * levels) / levels;
-
-    // --- エッジ強調（視線と法線の角度）
-    float edge = 1.0 - abs(dot(normal, viewDir));
-    float edgeMask = smoothstep(0.3, 0.6, edge); // エッジの太さ調整
-
-    // --- ストローク調ノイズ（fbm推奨）
-    //float n = fbm(gl_FragCoord.xy * 0.05 + iTime); // iTimeがあれば
-    float n = fbm(gl_FragCoord.xy * 0.05); 
-    float strokeEffect = mix(1.0, 0.8, n * edgeMask); // エッジ上で揺れる
-
-    // --- シャドウと結合
+    float diff   = clamp(dot(normal, lightDir), 0.0, 1.0);
     float shadow = softShadow(p + normal * 0.01, lightDir);
-
-    vec3 baseColor = vec3(0.95, 0.85, 0.65); // ペン風下地色
-    vec3 color = baseColor * toonShade * shadow * strokeEffect;
+    vec3  color  = vec3(1.0) * diff * shadow;
 
     outColor = vec4(color, 1.0);
 }
-
-
-*/

@@ -1,61 +1,343 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Spiral Interaction</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDF Static Renderer</title>
     <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
+      body {
+          margin: 0;
+          overflow: hidden;
+          background-color: black;
+          color: white;
+          font-family: sans-serif;
       }
-      canvas {
-        display: block;
+      #glsl-controls {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 260px;
+          height: 100vh;
+          background: rgba(0, 0, 0, 0.4);
+          padding: 12px;
+          padding-left:20px;
+          box-sizing: border-box;
+          overflow-y: auto;
+          display: none;
+          flex-direction: column;
+          gap: 10px;
+          z-index: 5;
+      }
+      #param-toggle {
+          position: absolute;
+          top: 10px;
+          left: 0;
+          width: 24px;
+          height: 24px;
+          background: rgba(0, 0, 0, 0.5);
+          color: white;
+          font-size: 18px;
+          border: none;
+          cursor: pointer;
+          z-index: 6;
+      }
+      #ui-bar {
+          position: absolute;
+          top: 10px;
+          left: 280px;
+          display: flex;
+          gap: 10px;
+          z-index: 10;
+      }
+      #ui-bar-right {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          display: flex;
+          gap: 10px;
+          z-index: 10;
+      }
+      .ui-element {
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.15);
+          color: white;
+          font-size: 0.9em;
+          padding: 4px 12px;
+          border: none;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+      }
+      #settings-bar {
+          position: absolute;
+          top: 50px;
+          right: 10px;
+          display: none;
+          flex-direction: column;
+          gap: 12px;
+          z-index: 9;
+          background-color: rgba(0, 0, 0, 0.5);
+          border-radius: 8px;
+          padding: 12px;
+      }
+      .settings-section {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+      }
+      .ui-textfield {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          font-family: monospace;
+          padding: 4px 6px;
+          border-radius: 4px;
+      }
+      select.ui-element option {
+          background-color: black;
+          color: white;
+      }
+      #info {
+          position: absolute;
+          bottom: 10px;
+          left: 280px;
+          background: rgba(0, 0, 0, 0.7);
+          padding: 10px;
+          font-size: 0.8em;
+          display: none;
+          white-space: pre-wrap;
+          z-index: 6;
+      }
+      #save-feedback {
+          position: absolute;
+          top: 10px;
+          right: 140px;
+          color: lightgreen;
+          font-size: 0.9em;
+          display: none;
+          z-index: 15;
+      }
+      #save-feedback.error {
+          color: tomato;
       }
     </style>
   </head>
   <body>
-    <script type="module" src="/src/main.ts"></script>
-    <pre id="info" style="font-family: monospace; white-space: pre-wrap;"></pre>
-<script>
-(async function() {
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    <button id="param-toggle">></button>
+    <div id="glsl-controls"></div>
+    
+    <div id="ui-bar">
+      <button id="toggle-ui"   class="ui-element">Hide UI</button>
+      <button id="save-button" class="ui-element">Save</button>
+      <button id="info-toggle" class="ui-element">Info</button>
+    </div>
+    
+    <div id="ui-bar-right">
+      <button id="settings-toggle" class="ui-element">Settings</button>
+    </div>
+    
+    <div id="settings-bar" style="display:none">
+      <div class="settings-section">
+        <label>Resolution</label>
+        <select id="preset-size" class="ui-element">
+          <option value="7680x4320">8K (7680x4320)</option>
+          <option value="5120x2880">5K (5120x2880)</option>
+          <option value="3840x2160" selected>4K (3840x2160)</option>
+          <option value="2560x1440">WQHD (2560x1440)</option>
+          <option value="1920x1080">Full HD (1920x1080)</option>
+          <option value="1080x1080">Square (1080x1080)</option>
+          <option value="1200x675">Twitter (1200x675)</option>
+          <option value="custom">Custom</option>
+        </select>
+        <div style="display: flex; gap: 6px;">
+          <input type="number" id="width-input" class="ui-textfield" placeholder="width" value="3840" style="width: 80px;" />
+          <input type="number" id="height-input" class="ui-textfield" placeholder="height" value="2160" style="width: 80px;" />
+        </div>
+      </div>
+      <div class="settings-section">
+        <label>Output</label>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="text" id="filename-input" class="ui-textfield" placeholder="filename" style="width: 140px;" />
+          <span>.png</span>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+        <button id="close-settings" class="ui-element">Close</button>
+      </div>
+    </div>
+    
+    <div id="save-feedback"></div>
+    <pre id="info"></pre>
+    
+    <script>
+      const glslControls = document.getElementById('glsl-controls');
+      const paramToggle  = document.getElementById('param-toggle');
+      const uiBar        = document.getElementById('ui-bar');
+      const uiBarRight   = document.getElementById('ui-bar-right');
+      const infoBox      = document.getElementById('info');
+      const settingsBar  = document.getElementById('settings-bar');
+      const feedback     = document.getElementById('save-feedback');
+      const title        = document.title;
 
-  let info = '';
+      document.getElementById('filename-input').value = title.replace(/\s+/g, '_').toLowerCase();
 
-  if (!gl) {
-    info = 'WebGL not supported in this environment.';
-  } else {
-    const dbgRenderInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      
 
-    info += `WebGL Version:       ${gl.getParameter(gl.VERSION)}\n`;
-    info += `GLSL Version:        ${gl.getParameter(gl.SHADING_LANGUAGE_VERSION)}\n`;
-    info += `Vendor:              ${gl.getParameter(gl.VENDOR)}\n`;
-    info += `Renderer:            ${gl.getParameter(gl.RENDERER)}\n`;
+      
+      function setParamPanelVisible(visible) {
+          glslControls.style.display = visible ? 'flex' : 'none';
+          paramToggle.textContent = visible ? '<' : '>';
+      }
+      
+      paramToggle.addEventListener('click', () => {
+          const isVisible = glslControls.style.display !== 'none';
+          setParamPanelVisible(!isVisible);
+      });
+      
+      document.getElementById('toggle-ui').onclick = () => {
+          /*
+          const isVisible = uiBar.style.display !== 'none';
+          uiBar.style.display = isVisible ? 'none' : 'flex';
+          uiBarRight.style.display = isVisible ? 'none' : 'flex';
+          settingsBar.style.display = 'none';
+          */
+          toggleUIVisibility();
+      };
+      
+      document.getElementById('info-toggle').onclick = () => {
+          infoBox.style.display = infoBox.style.display === 'block' ? 'none' : 'block';
+      };
+      
+      document.getElementById('settings-toggle').onclick = () => {
+          const isHidden = settingsBar.style.display === 'none';
+          console.log(isHidden);
+          settingsBar.style.display = isHidden ? 'flex' : 'none';
+          settingsBar.style.border = isHidden ? '2px solid white' : 'none';
+      };
 
-    if (dbgRenderInfo) {
-      info += `Unmasked Vendor:     ${gl.getParameter(dbgRenderInfo.UNMASKED_VENDOR_WEBGL)}\n`;
-      info += `Unmasked Renderer:   ${gl.getParameter(dbgRenderInfo.UNMASKED_RENDERER_WEBGL)}\n`;
-    }
+      
+      document.getElementById('close-settings').onclick = () => {
+          settingsBar.style.display = 'none';
+      };
+      
+      document.getElementById('save-button').onclick = () => {
+          try {
+              const canvas = document.querySelector('canvas');
+              const link = document.createElement('a');
+              const filename = document.getElementById('filename-input').value || 'render';
+              link.download = `${filename}.png`;
+              link.href = canvas.toDataURL('image/png');
+              link.click();
+              showFeedback(true);
+          } catch (e) {
+              showFeedback(false);
+          }
+      };
+      function hideAllUI() {
+          console.log("hideAllUI");
+        document.getElementById('param-toggle').style.display = 'none';
+        document.getElementById('glsl-controls').style.display = 'none';
+        document.getElementById('ui-bar').style.display = 'none';
+        document.getElementById('ui-bar-right').style.display = 'none';
+        document.getElementById('settings-bar').style.display = 'none';
+        document.getElementById('info').style.display = 'none';
+      };
+      function showAllUI() {
+        document.getElementById('param-toggle').style.display = 'block';
+        document.getElementById('glsl-controls').style.display = 'flex';
+        document.getElementById('ui-bar').style.display = 'flex';
+        document.getElementById('ui-bar-right').style.display = 'flex';
+        document.getElementById('settings-bar').style.display = 'none';
+        document.getElementById('info').style.display = 'none';
+      };
 
-    info += `\n--- Capabilities ---\n`;
-    info += `MAX_RENDERBUFFER_SIZE: ${gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)}\n`;
-    info += `MAX_TEXTURE_SIZE:      ${gl.getParameter(gl.MAX_TEXTURE_SIZE)}\n`;
-    info += `MAX_VIEWPORT_DIMS:     ${gl.getParameter(gl.MAX_VIEWPORT_DIMS)}\n`;
-
-    info += `\n--- Display Info ---\n`;
-    info += `window.devicePixelRatio: ${window.devicePixelRatio}\n`;
-    info += `Screen Resolution:       ${window.screen.width} x ${window.screen.height}\n`;
-    info += `Available Screen Size:   ${window.screen.availWidth} x ${window.screen.availHeight}\n`;
-  }
-
-  document.getElementById('info').textContent = info;
-})();
-</script>
 
 
+      function showFeedback(success = true) {
+          feedback.textContent = success ? 'Saved' : 'Failed';
+          feedback.className = success ? '' : 'error';
+          feedback.style.display = 'block';
+          setTimeout(() => {
+              feedback.style.display = 'none';
+          }, 2000);
+      }
+      
+      let uiHidden = false;
+
+      function toggleUIVisibility() {
+          console.log("toggle UI visibility");
+        if (uiHidden) {
+          showAllUI();
+        } else {
+          hideAllUI();
+        }
+        uiHidden = !uiHidden;
+      }
+
+      
+      function toggleSettingsVisibility() {
+          settings.style.display = settings.style.display === 'none' ? 'flex' : 'none';
+      }
+
+      document.getElementById('preset-size').addEventListener('change', e => {
+          const val = e.target.value;
+          if (val === 'custom') return;
+          const [w, h] = val.split('x');
+          document.getElementById('width-input').value = w;
+          document.getElementById('height-input').value = h;
+      });
+
+      async function showInfo() {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        let info = '';
+        if (!gl) {
+          info = 'WebGL not supported in this environment.';
+        } else {
+          const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+          info += `WebGL Version:       ${gl.getParameter(gl.VERSION)}\n`;
+          info += `GLSL Version:        ${gl.getParameter(gl.SHADING_LANGUAGE_VERSION)}\n`;
+          info += `Vendor:              ${gl.getParameter(gl.VENDOR)}\n`;
+          info += `Renderer:            ${gl.getParameter(gl.RENDERER)}\n`;
+          if (dbg) {
+            info += `Unmasked Vendor:     ${gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL)}\n`;
+            info += `Unmasked Renderer:   ${gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)}\n`;
+          }
+          info += `\n--- Capabilities ---\n`;
+          info += `MAX_RENDERBUFFER_SIZE: ${gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)}\n`;
+          info += `MAX_TEXTURE_SIZE:      ${gl.getParameter(gl.MAX_TEXTURE_SIZE)}\n`;
+          info += `MAX_VIEWPORT_DIMS:     ${gl.getParameter(gl.MAX_VIEWPORT_DIMS)}\n`;
+          info += `\n--- Display Info ---\n`;
+          info += `window.devicePixelRatio: ${window.devicePixelRatio}\n`;
+          info += `Screen Resolution:       ${window.screen.width} x ${window.screen.height}\n`;
+          info += `Available Screen Size:   ${window.screen.availWidth} x ${window.screen.availHeight}`;
+        }
+        infoBox.textContent = info;
+      }
+
+      showInfo();
+
+
+
+
+      
+      window.addEventListener('dblclick', toggleUIVisibility);
+      window.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 2) toggleUIVisibility();
+      });
+      
+      document.getElementById('toggle-ui').onclick = toggleUIVisibility;
+      //document.getElementById('toggle-settings').onclick = toggleSettingsVisibility;
+      
+      
+      window.setParamPanelVisible = setParamPanelVisible;
+
+
+      
+      </script>
+    
+    <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
 

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDF Static Renderer</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: black;
+        color: white;
+        font-family: sans-serif;
+      }
+      #ui-bar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 10;
+        background-color: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        padding: 4px 8px;
+      }
+      #left-controls, #right-controls {
+        display: flex;
+        gap: 8px;
+      }
+      #settings-bar {
+        position: absolute;
+        top: 50px;
+        left: 10px;
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        z-index: 9;
+        background-color: rgba(0, 0, 0, 0.5);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .settings-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ui-element {
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+        font-size: 0.9em;
+        padding: 4px 8px;
+        border: none;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+      }
+      .ui-textfield {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        font-family: monospace;
+        padding: 4px 6px;
+        border-radius: 4px;
+      }
+      select.ui-element option {
+        background-color: black;
+        color: white;
+      }
+      #info {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        font-size: 0.8em;
+        display: none;
+        white-space: pre-wrap;
+      }
+      #save-feedback {
+        position: absolute;
+        top: 10px;
+        right: 100px;
+        color: lightgreen;
+        font-size: 0.9em;
+        display: none;
+        z-index: 15;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ui-bar">
+      <div id="left-controls">
+        <button id="toggle-ui" class="ui-element">Hide UI</button>
+        <button id="save-button" class="ui-element">Save</button>
+        <button id="info-toggle" class="ui-element">Info</button>
+      </div>
+      <div id="right-controls">
+        <button id="settings-toggle" class="ui-element">Settings</button>
+      </div>
+    </div>
+
+    <div id="settings-bar">
+      <button id="close-settings" class="ui-element" style="align-self: flex-end;">Close</button>
+      <div class="settings-section">
+        <label>Resolution</label>
+        <select id="preset-size" class="ui-element">
+          <option value="7680x4320">8K (7680x4320)</option>
+          <option value="5120x2880">5K (5120x2880)</option>
+          <option value="3840x2160" selected>4K (3840x2160)</option>
+          <option value="2560x1440">WQHD (2560x1440)</option>
+          <option value="1920x1080">Full HD (1920x1080)</option>
+          <option value="1080x1080">Square (1080x1080)</option>
+          <option value="1200x675">Twitter (1200x675)</option>
+          <option value="custom">Custom</option>
+        </select>
+        <div style="display: flex; gap: 6px;">
+          <input type="number" id="width-input" class="ui-textfield" placeholder="width" value="3840" style="width: 80px;" />
+          <input type="number" id="height-input" class="ui-textfield" placeholder="height" value="2160" style="width: 80px;" />
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <label>Output</label>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button id="folder-button" class="ui-element">Select Folder</button>
+          <span id="folder-path" style="font-size: 0.85em; opacity: 0.7;">(not selected)</span>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="text" id="filename-input" class="ui-textfield" placeholder="filename" style="width: 140px;" />
+          <span>.png</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="save-feedback">? Saved</div>
+    <pre id="info"></pre>
+
+    <script>
+      const ui = document.getElementById('ui-bar');
+      const settings = document.getElementById('settings-bar');
+      const infoBox = document.getElementById('info');
+      const feedback = document.getElementById('save-feedback');
+      const title = document.title;
+
+      document.getElementById('filename-input').value = title.replace(/\s+/g, '_').toLowerCase();
+
+      function toggleUI() {
+        if (settings.style.display !== 'none') return; // block toggle while settings open
+        const isVisible = ui.style.display !== 'none';
+        ui.style.display = isVisible ? 'none' : 'flex';
+      }
+
+      function toggleSettings() {
+        settings.style.display = settings.style.display === 'none' ? 'flex' : 'none';
+      }
+
+      function toggleInfo() {
+        const visible = infoBox.style.display === 'block';
+        infoBox.style.display = visible ? 'none' : 'block';
+      }
+
+      function showSaveFeedback() {
+        feedback.style.display = 'block';
+        setTimeout(() => {
+          feedback.style.display = 'none';
+        }, 2000);
+      }
+
+      document.getElementById('toggle-ui').onclick = toggleUI;
+      document.getElementById('settings-toggle').onclick = toggleSettings;
+      document.getElementById('info-toggle').onclick = toggleInfo;
+      document.getElementById('save-button').onclick = showSaveFeedback;
+      document.getElementById('close-settings').onclick = () => settings.style.display = 'none';
+
+      window.addEventListener('dblclick', () => {
+        if (settings.style.display === 'none') toggleUI();
+      });
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2 && settings.style.display === 'none') toggleUI();
+      });
+
+      document.getElementById('preset-size').addEventListener('change', e => {
+        const val = e.target.value;
+        if (val === 'custom') return;
+        const [w, h] = val.split('x');
+        document.getElementById('width-input').value = w;
+        document.getElementById('height-input').value = h;
+      });
+
+      document.getElementById('folder-button').onclick = async () => {
+        const folderPath = 'selected/folder';
+        document.getElementById('folder-path').textContent = folderPath;
+      };
+
+      async function showInfo() {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        let info = '';
+        if (!gl) {
+          info = 'WebGL not supported in this environment.';
+        } else {
+          const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+          info += `WebGL Version:       ${gl.getParameter(gl.VERSION)}\n`;
+          info += `GLSL Version:        ${gl.getParameter(gl.SHADING_LANGUAGE_VERSION)}\n`;
+          info += `Vendor:              ${gl.getParameter(gl.VENDOR)}\n`;
+          info += `Renderer:            ${gl.getParameter(gl.RENDERER)}\n`;
+          if (dbg) {
+            info += `Unmasked Vendor:     ${gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL)}\n`;
+            info += `Unmasked Renderer:   ${gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)}\n`;
+          }
+          info += `\n--- Capabilities ---\n`;
+          info += `MAX_RENDERBUFFER_SIZE: ${gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)}\n`;
+          info += `MAX_TEXTURE_SIZE:      ${gl.getParameter(gl.MAX_TEXTURE_SIZE)}\n`;
+          info += `MAX_VIEWPORT_DIMS:     ${gl.getParameter(gl.MAX_VIEWPORT_DIMS)}\n`;
+          info += `\n--- Display Info ---\n`;
+          info += `window.devicePixelRatio: ${window.devicePixelRatio}\n`;
+          info += `Screen Resolution:       ${window.screen.width} x ${window.screen.height}\n`;
+          info += `Available Screen Size:   ${window.screen.availWidth} x ${window.screen.availHeight}`;
+        }
+        infoBox.textContent = info;
+      }
+
+      showInfo();
+    </script>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
+
+
