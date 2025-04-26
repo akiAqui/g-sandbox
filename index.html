@@ -29,9 +29,6 @@
           z-index: 5;
       }
       #param-toggle {
-          position: absolute;
-          top: 10px;
-          left: 0;
           width: 24px;
           height: 24px;
           background: rgba(0, 0, 0, 0.5);
@@ -124,8 +121,11 @@
     </style>
   </head>
   <body>
-    <button id="param-toggle">></button>
-    <div id="glsl-controls"></div>
+    <div id="button-container" style="display:flex; justify-content: flex-end; width: 260px">
+      <button id="param-toggle" style="justify-content:flex-end" >あ</button>
+    </div>
+    <div id="glsl-controls">
+    </div>
     
     <div id="ui-bar">
       <button id="toggle-ui"   class="ui-element">Hide UI</button>
@@ -171,14 +171,15 @@
     <pre id="info"></pre>
     
     <script>
-      const glslControls = document.getElementById('glsl-controls');
-      const paramToggle  = document.getElementById('param-toggle');
-      const uiBar        = document.getElementById('ui-bar');
-      const uiBarRight   = document.getElementById('ui-bar-right');
-      const infoBox      = document.getElementById('info');
-      const settingsBar  = document.getElementById('settings-bar');
-      const feedback     = document.getElementById('save-feedback');
-      const title        = document.title;
+      const glslControls    = document.getElementById('glsl-controls');
+      const buttonContainer = document.getElementById('button-container');
+      const paramToggle     = document.getElementById('param-toggle');
+      const uiBar           = document.getElementById('ui-bar');
+      const uiBarRight      = document.getElementById('ui-bar-right');
+      const infoBox         = document.getElementById('info');
+      const settingsBar     = document.getElementById('settings-bar');
+      const feedback        = document.getElementById('save-feedback');
+      const title           = document.title;
 
       document.getElementById('filename-input').value = title.replace(/\s+/g, '_').toLowerCase();
 
@@ -187,7 +188,8 @@
       
       function setParamPanelVisible(visible) {
           glslControls.style.display = visible ? 'flex' : 'none';
-          paramToggle.textContent = visible ? '<' : '>';
+          paramToggle.textContent = visible ? '◀' : '▶';
+          buttonContainer.style.justifyContent = visible ? 'flex-end' : 'flex-start';
       }
       
       paramToggle.addEventListener('click', () => {
@@ -296,10 +298,22 @@
       showInfo();
 
 
+window.addEventListener('dblclick', function (e) {
+  const target = e.target;
 
+  const isInsideUI =
+    document.getElementById('glsl-controls')?.contains(target) ||
+    document.getElementById('ui-bar')?.contains(target) ||
+    document.getElementById('ui-bar-right')?.contains(target) ||
+    document.getElementById('settings-bar')?.contains(target);
 
-      
-      window.addEventListener('dblclick', toggleUIVisibility);
+  if (!isInsideUI) {
+    toggleUIVisibility();
+  }
+});
+
+      //window.addEventListener('dblclick', toggleUIVisibility);
+                                        
       window.addEventListener('touchstart', (e) => {
           if (e.touches.length === 2) toggleUIVisibility();
       });
