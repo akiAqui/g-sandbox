@@ -4,8 +4,9 @@ import fragmentShader from './fragment.glsl'
 import vertexShader from './vertex.glsl'
 
 
-const camera_position = new THREE.Vector3(-0.66, 1.24, 1.71); 
-const target          = new THREE.Vector3(0.0, 0.0, 0.0);
+//const camera_position = new THREE.Vector3(-0.66, 1.24, 1.71);
+const camera_position = new THREE.Vector3(6.86, 2.07, 8.26); 
+const target          = new THREE.Vector3(3.8, -0.95, -1.21);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
 renderer.setSize(window.innerWidth, window.innerHeight)

@@ -16,6 +16,7 @@ out vec4 outColor;
   - もし、テクスチャを張るなら省略する
  */
 
+#define PI 3.141562
 #define HIGH_QUALITY_STEPS 256
 #define LOW_QUALITY_STEPS 20
 #define HIGH_QUALITY_MAXDIST 10.0
@@ -25,6 +26,47 @@ out vec4 outColor;
 #define MIN_STEP 0.001
 #define MAX_STEP 0.2
 
+
+//
+// ノイズ関連
+//
+float sdBox(vec2 p, vec2 b) {
+    vec2 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+float fbm(vec2 p) {
+    float value = 0.0;
+    float amp = 0.5;
+    float freq = 1.0;
+    for (int i = 0; i < 5; i++) {
+        value += amp * noise(p * freq);
+        freq *= 2.0;
+        amp *= 0.5;
+    }
+    return value;
+}
+float sdBoxWobble(vec3 p, vec3 center, vec2 size, float wobbleScale, float wobbleFreq, float thickness) {
+    vec2 q = p.xy - center.xy;
+    float base = sdBox(q, size);
+    float edgeInfluence = smoothstep(0.05, 0.0, abs(base));
+    float n = fbm(q * wobbleFreq) * 2.0 - 1.0;
+    float dXY = base + n * wobbleScale * edgeInfluence;
+    float dZ  = abs(p.z - center.z) - thickness * 0.5;
+    return max(dXY, dZ);
+}
 
 // z軸周り回転(2x2行列)
 //  c -s
@@ -57,6 +99,45 @@ mat3 rotY(float a) {
 //
 // 各種sdfオブジェクトの定義
 //
+
+
+//
+// 座標軸を描く
+//
+float axis(vec3 p) {
+    float inf = 1e5;
+    float r = 0.04;
+    float len = 2.0;
+    float marker_r=0.05;
+    // 軸（シリンダー）
+    float x = (abs(p.x) <= len) ? length(vec2(p.y, p.z)) - r : inf;
+    float y = (abs(p.y) <= len) ? length(vec2(p.x, p.z)) - r : inf;
+    float z = (abs(p.z) <= len) ? length(vec2(p.x, p.y)) - r : inf;
+    float dx = x;
+    float dy = y;
+    float dz = z;
+    {// === X軸: 1個 ===
+        vec3 center = vec3(len + marker_r, 0.0, 0.0);
+        dx = min(dx, length(p - center) - marker_r);
+    }
+    {// === Y軸: 2個 ===
+        float h = marker_r * 1.5; // 間隔指定（任意調整可能）
+        for (int i = 0; i < 2; i++) {
+            float offset = h * (float(i) + 0.01);
+            vec3 center = vec3(0.0, len + offset, 0.0);
+            dy = min(dy, length(p - center) - marker_r);
+        }
+    }
+    {// === Z軸: 3個 ===
+        float h = marker_r * 1.5;
+        for (int i = 0; i < 3; i++) {
+            float offset = h * (float(i) + 0.5);
+            vec3 center = vec3(0.0, 0.0, len + offset);
+            dz = min(dz, length(p - center) - marker_r);
+        }
+    }
+    return min(min(dx, dy), dz);
+}
 
 // 半球
 float hemiSphere(vec3 p, vec3 c, float r, float phiX) {
@@ -255,7 +336,8 @@ float crescent(vec3 p, vec3 center1, float r1, vec3 center2, float r2) {
 }
 
 // 
-// 視線方向ベクトルをカメラ位置と注視点から構築する
+// カメラ位置から、スクリーンの特定座標をつなぐレイの方向ベクトルを算出する関数
+// 全てのスクリーン座標点に関してfragment shaderでスキャンされる
 //
 vec3 calcRayDir(vec2 uv, vec3 ro, vec3 target) {
     vec3 forward = normalize(target - ro);
@@ -267,91 +349,7 @@ vec3 calcRayDir(vec2 uv, vec3 ro, vec3 target) {
 
 
 
-//
-// ノイズ関連
-//
-float sdBox(vec2 p, vec2 b) {
-    vec2 d = abs(p) - b;
-    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
-}
 
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-
-float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-
-    return mix(
-        mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-        u.y
-    );
-}
-
-float fbm(vec2 p) {
-    float value = 0.0;
-    float amp = 0.5;
-    float freq = 1.0;
-    for (int i = 0; i < 5; i++) {
-        value += amp * noise(p * freq);
-        freq *= 2.0;
-        amp *= 0.5;
-    }
-    return value;
-}
-
-float sdBoxWobble(vec3 p, vec3 center, vec2 size, float wobbleScale, float wobbleFreq, float thickness) {
-    vec2 q = p.xy - center.xy;
-    float base = sdBox(q, size);
-
-    float edgeInfluence = smoothstep(0.05, 0.0, abs(base));
-    float n = fbm(q * wobbleFreq) * 2.0 - 1.0;
-
-    float dXY = base + n * wobbleScale * edgeInfluence;
-    float dZ  = abs(p.z - center.z) - thickness * 0.5;
-    return max(dXY, dZ);
-}
-
-
-float axis(vec3 p) {
-    float inf = 1e5;
-    float r = 0.04;
-    float len = 2.0;
-    float marker_r=0.05;
-    // 軸（シリンダー）
-    float x = (abs(p.x) <= len) ? length(vec2(p.y, p.z)) - r : inf;
-    float y = (abs(p.y) <= len) ? length(vec2(p.x, p.z)) - r : inf;
-    float z = (abs(p.z) <= len) ? length(vec2(p.x, p.y)) - r : inf;
-
-    float dx = x;
-    float dy = y;
-    float dz = z;
-
-    {// === X軸: 1個 ===
-        vec3 center = vec3(len + marker_r, 0.0, 0.0);
-        dx = min(dx, length(p - center) - marker_r);
-    }
-    {// === Y軸: 2個 ===
-        float h = marker_r * 1.5; // 間隔指定（任意調整可能）
-        for (int i = 0; i < 2; i++) {
-            float offset = h * (float(i) + 0.01);
-            vec3 center = vec3(0.0, len + offset, 0.0);
-            dy = min(dy, length(p - center) - marker_r);
-        }
-    }
-    {// === Z軸: 3個 ===
-        float h = marker_r * 1.5;
-        for (int i = 0; i < 3; i++) {
-            float offset = h * (float(i) + 0.5);
-            vec3 center = vec3(0.0, 0.0, len + offset);
-            dz = min(dz, length(p - center) - marker_r);
-        }
-    }
-    return min(min(dx, dy), dz);
-}
 
 // この関数は、オブジェクトの関数を内部に持ち、
 // ある位置pで各オブジェクトの内部なら+/0/-を返却するSDF関数群のうち
@@ -359,19 +357,18 @@ float axis(vec3 p) {
 //
 float sceneSDF(vec3 p) {
   float d=100.0;
-  //d = min(d,axis(p, 0.04, 3.0));
+  float pos;
+  float dif=1.4;
+  float start=0.0;
+  float div=12.0;
+  
   if (uAxis) {
     d = min(d,axis(p));
   }
-  d = min(d,beanCurve (p, vec3(-1.0, 0.3, 1.0), 0.1, 1.2));
-  d = min(d,beanCurve (p, vec3(-1.2, 0.3, 1.0), 0.1, 1.2));
-  d = min(d,beanCurve (p, vec3(-1.4, 0.3, 1.0), 0.1, 1.2));
-  d = min(d,beanCurve (p, vec3(-1.6, 0.3, 1.0), 0.1, 1.2));  
-  d = min(d,beanCurve (p, vec3(-1.8, 0.3, 1.0), 0.1, 1.2));  
-  d = min(d,beanCurve (p, vec3(-2.0, 0.3, 1.0), 0.1, 1.2));
-  d = min(d,beanCurve (p, vec3(-2.3, 0.3, 1.0), 0.1, 1.2));
-  d = min(d,beanCurve (p, vec3(-2.6, 0.3, 1.0), 0.1, 1.2));
-  d = min(d,beanCurve (p, vec3(-3.0, 0.3, 1.0), 0.1, 1.2));    
+  for (int i=0; i<19; i++){
+    pos = start + dif*float(i);
+    d = min(d,beanCurve (p, vec3( pos, 0.3, 1.0), PI/div*float(i), 1.2));
+  }
   /*                     
   d = min(d,spiralTube(p, vec3(-0.0, 0.4, 0.0),  0.3,  0.08, 0.03,   0.5));
   d = min(d,spiralTube(p, vec3(-0.1, 0.4, 0.0),  0.3,  0.08, 0.05,   1.001));
@@ -403,10 +400,10 @@ vec3 estimateNormal(vec3 p) {
         sceneSDF(p + vec3(0, 0, eps)) - sceneSDF(p - vec3(0, 0, eps))
     ));
 }
-
-// roから、rdベクトルの方向に進んむ
+//
+// roから、rdベクトルの方向に進む
 // 何かのオブジェクトに衝突したらカメラ位置からの累積距離であるd0を返却する
-// もし最大距離よりも進んでいたら-1.0を返却する
+// もし最大距離よりも進んでいたら(何もなかったら)-1.0を返却する
 // d0が累積で進んだ距離
 //
 float rayMarch(vec3 ro, vec3 rd) {
@@ -469,7 +466,13 @@ void main() {
     vec3 tg = uTarget;
     ro+=(0.4, 10.2, 0.2);
     tg+=(1.0, 1.0, -2.2);
+
+    // スキャンされるスクリーン座標点に対して
+    // カメラからスクリーンの特定座標をつなぐ方向ベクトルを計算
     vec3 rd = calcRayDir(uv, ro, tg);
+
+    // 各スクリーン座標点について方向ベクトルを用いて
+    // 衝突判定をしてRayMarchingを実施
     float dist = rayMarch(ro, rd);
     if (dist < 0.0) {
         outColor = vec4(0.0);
