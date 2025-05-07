@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDF Static Renderer</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: black;
+        color: white;
+        font-family: sans-serif;
+      }
+      #ui-bar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        z-index: 10;
+      }
+      .ui-element {
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        font-size: 0.9em;
+        padding: 4px 8px;
+        border: none;
+        height: 32px;
+        display: flex;
+        align-items: center;
+      }
+      #info {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        font-size: 0.8em;
+        display: none;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ui-bar">
+      <select id="preset-size" class="ui-element">
+        <option value="1920x1080">Full HD (1920x1080)</option>
+        <option value="2560x1440">WQHD (2560x1440)</option>
+        <option value="3840x2160">4K (3840x2160)</option>
+        <option value="1080x1080">Square (1080x1080)</option>
+        <option value="1200x675">Twitter (1200x675)</option>
+        <option value="custom">Custom</option>
+      </select>
+      <input type="number" id="width-input" class="ui-element" placeholder="width" style="width: 80px;" />
+      <input type="number" id="height-input" class="ui-element" placeholder="height" style="width: 80px;" />
+      <input type="text" id="filename-input" class="ui-element" placeholder="filename" style="width: 120px;" />
+      <button id="save-button" class="ui-element">PNG保存</button>
+      <button id="hide-ui" class="ui-element">hide UI</button>
+    </div>
+
+    <pre id="info"></pre>
+
+    <script>
+      const ui = document.getElementById('ui-bar');
+      const infoBox = document.getElementById('info');
+      const title = document.title;
+      document.getElementById('filename-input').value = title.replace(/\s+/g, '_').toLowerCase();
+
+      // UI toggle
+      function toggleUIVisibility() {
+        ui.style.display = ui.style.display === 'none' ? 'flex' : 'none';
+      }
+
+      // double click (PC)
+      window.addEventListener('dblclick', toggleUIVisibility);
+
+      // two finger tap (mobile)
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) toggleUIVisibility();
+      });
+
+      // preset select → input update
+      document.getElementById('preset-size').addEventListener('change', e => {
+        const val = e.target.value;
+        if (val === 'custom') return;
+        const [w, h] = val.split('x');
+        document.getElementById('width-input').value = w;
+        document.getElementById('height-input').value = h;
+      });
+
+      // info display on load
+      (async function showInfo() {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        let info = '';
+        if (!gl) {
+          info = 'WebGL not supported in this environment.';
+        } else {
+          const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+          info += `WebGL Version:       ${gl.getParameter(gl.VERSION)}\n`;
+          info += `GLSL Version:        ${gl.getParameter(gl.SHADING_LANGUAGE_VERSION)}\n`;
+          info += `Vendor:              ${gl.getParameter(gl.VENDOR)}\n`;
+          info += `Renderer:            ${gl.getParameter(gl.RENDERER)}\n`;
+          if (dbg) {
+            info += `Unmasked Vendor:     ${gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL)}\n`;
+            info += `Unmasked Renderer:   ${gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)}\n`;
+          }
+          info += `\n--- Capabilities ---\n`;
+          info += `MAX_RENDERBUFFER_SIZE: ${gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)}\n`;
+          info += `MAX_TEXTURE_SIZE:      ${gl.getParameter(gl.MAX_TEXTURE_SIZE)}\n`;
+          info += `MAX_VIEWPORT_DIMS:     ${gl.getParameter(gl.MAX_VIEWPORT_DIMS)}\n`;
+          info += `\n--- Display Info ---\n`;
+          info += `window.devicePixelRatio: ${window.devicePixelRatio}\n`;
+          info += `Screen Resolution:       ${window.screen.width} x ${window.screen.height}\n`;
+          info += `Available Screen Size:   ${window.screen.availWidth} x ${window.screen.availHeight}`;
+        }
+        infoBox.textContent = info;
+        infoBox.style.display = 'block';
+        setTimeout(() => {
+          infoBox.style.display = 'none';
+        }, 8000);
+      })();
+    </script>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
+
